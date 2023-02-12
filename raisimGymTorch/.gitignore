@@ -16,3 +16,4 @@ id_rsa
 */data/*
 */data_ycb/*
 *event*
+/pretrained_policies/
