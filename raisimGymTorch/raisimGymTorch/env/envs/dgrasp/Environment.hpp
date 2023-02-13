@@ -290,6 +290,8 @@ namespace raisim {
             mano_->setGeneralizedForce(gen_force);
 
             /// reset box position/orientation/velocity
+            box->clearExternalForcesAndTorques();
+            //box = static_cast<raisim::Box*>(world_->addBox(2, 1, 0.5, 100, "", raisim::COLLISION(1)));
             box->setPosition(1.25, 0, 0.25);
             box->setOrientation(1,0,0,0);
             box->setVelocity(0,0,0,0,0,0);

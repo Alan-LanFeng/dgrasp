@@ -102,6 +102,15 @@ output_activation = nn.Tanh
 ### Load data labels
 if not args.test:
     dict_labels=joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
+    dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
+    # qpos_reset = dict_labels['qpos_reset'][:,:3]
+    # obj_reset = dict_labels['obj_pose_reset'][:,:3]
+    # vec = qpos_reset-obj_reset
+    # new_pos = vec+obj_reset
+    # dict_labels['qpos_reset'][:, :3] = new_pos
+    # dict_labels['qpos_reset'][:, 3:6] = dict_labels['final_qpos'][:,3:6]
+
+    dict_labels[7] = dict_labels
 else:
     dict_labels=joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
 

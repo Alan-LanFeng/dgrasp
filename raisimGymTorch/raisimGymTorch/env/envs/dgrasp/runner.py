@@ -2,6 +2,7 @@ from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin import dgrasp as mano
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
+from raisimGymTorch.helper.utils import get_obj_pcd
 import os
 import time
 import raisimGymTorch.algo.ppo.module as ppo_module
@@ -100,6 +101,18 @@ output_activation = nn.Tanh
 ### Load data labels
 if not args.test:
     dict_labels=joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
+    # dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
+    #
+    # # qpos_reset = dict_labels['qpos_reset'][:,:3]
+    # # obj_reset = dict_labels['obj_pose_reset'][:,:3]
+    # # vec = qpos_reset-obj_reset
+    # # new_pos = vec*1.3+obj_reset
+    # # dict_labels['qpos_reset'][:, :3] = new_pos
+    #
+    # new = {}
+    # for k,v in dict_labels.items():
+    #     dict_labels[k] = v[[0]]
+    # dict_labels[7] = dict_labels
 else:
     dict_labels=joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
 
@@ -157,13 +170,19 @@ else:
     qpos_reset = np.repeat(dict_labels[train_obj_id]['qpos_reset'],num_repeats,0)
 
 
+
 num_envs = final_qpos.shape[0]
 cfg['environment']['hand_model'] = "mano_mean_meshcoll.urdf" if args.mesh_collision else "mano_mean.urdf"
 cfg['environment']['num_envs'] = 1 if args.evaluate else num_envs
 cfg["testing"] = True if test_inference else False
 print('num envs', num_envs)
 
-env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
+# get obj pcd
+mesh_path = "/local/home/lafeng/Desktop/raisim/raisim_grasp/rsc/meshes_simplified/008_pudding_box/mesh_aligned.obj"
+obj_pcd = get_obj_pcd(mesh_path)
+obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], num_envs, 0)
+
+env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'],obj_pcd=obj_pcd)
 env.load_object(obj_idx_stacked,obj_w_stacked, obj_dim_stacked, obj_type_stacked)
 
 ### Setting dimensions from environments
@@ -184,7 +203,7 @@ else:
 ### Set up logging
 saver = ConfigurationSaver(log_dir = exp_path + "/raisimGymTorch/" + args.storedir + "/" + task_name,
                            save_items=[task_path + "/cfgs/" + args.cfg, task_path + "/Environment.hpp", task_path + "/runner.py"], test_dir=test_dir)
-tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
+#tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
 
 
 ### Set up RL algorithm
@@ -244,7 +263,7 @@ for update in range(args.num_iterations):
     ### Run episode rollouts
     env.reset_state(qpos_noisy_reset, np.zeros((num_envs,51),'float64'), obj_pose_reset)
     for step in range(n_steps):
-        obs = env.observe().astype('float64')
+        obs = env.observe(get_obj_pcd=False).astype('float64')
 
         action = ppo.observe(obs)
         reward, dones = env.step(action.astype('float64'))

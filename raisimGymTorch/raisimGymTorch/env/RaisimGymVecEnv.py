@@ -6,11 +6,12 @@
 import numpy as np
 import platform
 import os
-
+import copy
+from scipy.spatial.transform import Rotation as R
 
 class RaisimGymVecEnv:
 
-    def __init__(self, impl, cfg, normalize_ob=False, seed=0, normalize_rew=True, clip_obs=10.):
+    def __init__(self, impl, cfg, normalize_ob=False, seed=0, normalize_rew=True, clip_obs=10.,obj_pcd=None):
         if platform.system() == "Darwin":
             os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
@@ -25,6 +26,9 @@ class RaisimGymVecEnv:
         self._reward = np.zeros(self.num_envs, dtype=np.float32)
         self._done = np.zeros(self.num_envs, dtype=np.bool)
         self.rewards = [[] for _ in range(self.num_envs)]
+        #if obj_pcd:
+        self.obj_pcd = obj_pcd
+
 
     def seed(self, seed=None):
         self.wrapper.setSeed(seed)
@@ -58,8 +62,27 @@ class RaisimGymVecEnv:
         np.savetxt(mean_file_name, self.obs_rms.mean)
         np.savetxt(var_file_name, self.obs_rms.var)
 
-    def observe(self, update_mean=True):
+    def observe(self, update_mean=True,get_obj_pcd=False):
         self.wrapper.observe(self._observation)
+        obs = self._observation.copy()
+        if get_obj_pcd:
+
+            obj_pcd = self.obj_pcd
+            env_num,pcd_num,dim = obj_pcd.shape
+
+            obj_pos = copy.copy(self._observation[:,213:216])
+            obj_euler = copy.copy(self._observation[:,-3:])
+            #gc = copy.copy(self._observation[:,:51])
+
+            r_obj = obj_euler[:,np.newaxis].repeat(pcd_num,1).reshape(-1,dim)
+            obj_pos = obj_pos[:,np.newaxis].repeat(pcd_num,1).reshape(-1,dim)
+            r_obj = R.from_euler('XYZ',r_obj,degrees=False)
+
+            obj_pcd = r_obj.apply(obj_pcd.reshape(-1,dim))-obj_pos
+            obj_pcd = obj_pcd.reshape(env_num,-1)
+            obs = np.concatenate([obs,obj_pcd],dim=-1)
+            #hand_pcd = get_hand_mesh(gc,from_gc=True)
+
 
         if self.normalize_ob:
             if update_mean:
@@ -67,7 +90,7 @@ class RaisimGymVecEnv:
 
             return self._normalize_observation(self._observation)
         else:
-            return self._observation.copy()
+            return obs
 
     def set_root_control(self):
         self.wrapper.set_root_control()
