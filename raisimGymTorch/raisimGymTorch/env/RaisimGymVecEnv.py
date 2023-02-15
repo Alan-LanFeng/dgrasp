@@ -2,16 +2,16 @@
 # // This file is part of RaiSim//
 # // Copyright 2020, RaiSim Tech//
 # //----------------------------//
-
+import gym
 import numpy as np
 import platform
 import os
 import copy
 from scipy.spatial.transform import Rotation as R
 
-class RaisimGymVecEnv:
+class RaisimGymVecEnv(gym.Env):
 
-    def __init__(self, impl, cfg, normalize_ob=False, seed=0, normalize_rew=True, clip_obs=10.,obj_pcd=None):
+    def __init__(self, impl, cfg, normalize_ob=False, seed=0, normalize_rew=True, clip_obs=10.,label=None, obj_pcd=None):
         if platform.system() == "Darwin":
             os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
@@ -26,9 +26,17 @@ class RaisimGymVecEnv:
         self._reward = np.zeros(self.num_envs, dtype=np.float32)
         self._done = np.zeros(self.num_envs, dtype=np.bool)
         self.rewards = [[] for _ in range(self.num_envs)]
+        self.label = label
         #if obj_pcd:
         self.obj_pcd = obj_pcd
+        self.load_object(label['obj_idx_stacked'], label['obj_w_stacked'], label['obj_dim_stacked'], label['obj_type_stacked'])
+        self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'], label['final_contacts'])
 
+    def load_object(self, obj_idx, obj_weight, obj_dim, obj_type):
+        self.wrapper.load_object(obj_idx, obj_weight, obj_dim, obj_type)
+
+    def set_goals(self, obj_pos, ee_pos, pose, contact_pos, normals):
+        self.wrapper.set_goals(obj_pos, ee_pos, pose, contact_pos, normals)
 
     def seed(self, seed=None):
         self.wrapper.setSeed(seed)
@@ -47,7 +55,8 @@ class RaisimGymVecEnv:
 
     def step(self, action):
         self.wrapper.step(action, self._reward, self._done)
-        return self._reward.copy(), self._done.copy()
+        obs = self.observe().astype('float64')
+        return obs, self._reward.copy(), self._done.copy(), None
 
     def load_scaling(self, dir_name, iteration, count=1e5):
         mean_file_name = dir_name + "/mean" + str(iteration) + ".csv"
@@ -90,14 +99,30 @@ class RaisimGymVecEnv:
 
             return self._normalize_observation(self._observation)
         else:
-            return obs
+            return obs.astype('float64')
 
     def set_root_control(self):
         self.wrapper.set_root_control()
 
-    def reset(self):
-        self._reward = np.zeros(self.num_envs, dtype=np.float32)
-        self.wrapper.reset()
+    def reset(self,seed=None,option=None):
+        ### Add some noise to initial hand position
+        super().reset(seed=seed)
+
+        qpos_reset = self.label['qpos_reset'].copy()
+        obj_pose_reset = self.label['obj_pose_reset'].copy()
+        num_envs = qpos_reset.shape[0]
+        random_noise_pos = np.random.uniform([-0.02, -0.02, 0.01], [0.02, 0.02, 0.01], (num_envs, 3)).copy()
+        random_noise_qpos = np.random.uniform(-0.05, 0.05, (num_envs, 48)).copy()
+        qpos_noisy_reset = qpos_reset
+        qpos_noisy_reset[:, :3] += random_noise_pos[:, :3]
+        qpos_noisy_reset[:, 3:] += random_noise_qpos[:, :]
+
+        ### Run episode rollouts
+        self.reset_state(qpos_noisy_reset, np.zeros((num_envs, 51), 'float64'), obj_pose_reset)
+
+        obs = self.observe().astype('float64')
+        info = None
+        return obs, info
 
     def load_object(self, obj_idx, obj_weight, obj_dim, obj_type):
         self.wrapper.load_object(obj_idx, obj_weight, obj_dim, obj_type)

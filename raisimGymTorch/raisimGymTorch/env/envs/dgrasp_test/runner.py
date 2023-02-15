@@ -1,6 +1,6 @@
 from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin import dgrasp_test as mano
-from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
+from raisimGymTorch.env.RaisimGymVecEnv_original import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
 import os
 import time
@@ -102,15 +102,16 @@ output_activation = nn.Tanh
 ### Load data labels
 if not args.test:
     dict_labels=joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
-    dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
+    #dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
     # qpos_reset = dict_labels['qpos_reset'][:,:3]
     # obj_reset = dict_labels['obj_pose_reset'][:,:3]
     # vec = qpos_reset-obj_reset
     # new_pos = vec+obj_reset
     # dict_labels['qpos_reset'][:, :3] = new_pos
     # dict_labels['qpos_reset'][:, 3:6] = dict_labels['final_qpos'][:,3:6]
-
-    dict_labels[7] = dict_labels
+    # dict_labels['qpos_reset'] = dict_labels['final_qpos']
+    # dict_labels['obj_pose_reset'] = dict_labels['final_obj_pos']
+    #dict_labels[7] = dict_labels
 else:
     dict_labels=joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
 
@@ -224,10 +225,12 @@ env.reset_state(qpos_reset, np.zeros((num_envs,51),'float64'), obj_pose_reset)
 ### Evaluate trained model visually (note always the first environment gets visualized)
 if args.vis_evaluate:
     ### Start recording
-    if args.store_video:
-        env.turn_on_visualization()
-        env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(update)+'.mp4')
+
     for i in range(final_qpos.shape[0]):
+        if args.store_video:
+            env.turn_on_visualization()
+            env.start_video_recording(
+                datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_" + str(i) + '.mp4')
         ### Set labels and load objects for current label (only one visualization per rollout possible)
         qpos_reset_seq = qpos_reset.copy()
         qpos_reset_seq[0] = qpos_reset_seq[i]
