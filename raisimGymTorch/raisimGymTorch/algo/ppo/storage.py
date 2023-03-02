@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
-
+from raisimGymTorch.helper.utils import first_nonzero
 
 class RolloutStorage:
     def __init__(self, num_envs, num_transitions_per_env, actor_obs_shape, critic_obs_shape, actions_shape, device):
@@ -12,7 +12,7 @@ class RolloutStorage:
         self.rewards = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
         self.actions = torch.zeros(num_transitions_per_env, num_envs, *actions_shape).to(self.device)
         self.dones = torch.zeros(num_transitions_per_env, num_envs, 1).byte().to(self.device)
-
+        self.mask = torch.ones(num_transitions_per_env, num_envs, 1).bool().to(self.device)
         # For PPO
         self.actions_log_prob = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
         self.values = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
@@ -42,19 +42,33 @@ class RolloutStorage:
 
     def compute_returns(self, last_values, gamma, lam):
         advantage = 0
+        # self.dones[-3,0]=1
+        # self.dones[-2,0]=1
+        # self.values[:]=0.5
+        # self.rewards[:]=1
+        # last_values[:] = 0.5
+        val_with_last = torch.cat([self.values,last_values.unsqueeze(0)],dim=0)
+        a = first_nonzero(self.dones[...,0],0)
+        for i in range(len(a)):
+            if a[i]==-1:continue
+            indx = a[i].item()
+            val_with_last[indx+1:,i]=0
+            self.rewards[indx+1:,i]=0
+            self.mask[indx+1:,i]=False
+            self.dones[indx:, i] = 1
+
         for step in reversed(range(self.num_transitions_per_env)):
-            if step == self.num_transitions_per_env - 1:
-                next_values = last_values
-                # next_is_not_terminal = 1.0 - self.dones[step].float()
-            else:
-                next_values = self.values[step + 1]
-                # next_is_not_terminal = 1.0 - self.dones[step+1].float()
 
+            next_values = val_with_last[step + 1]
             next_is_not_terminal = 1.0 - self.dones[step].float()
-            delta = self.rewards[step] + next_is_not_terminal * gamma * next_values - self.values[step]
+            delta = self.rewards[step] + next_is_not_terminal * gamma * next_values - val_with_last[step]
             advantage = delta + next_is_not_terminal * gamma * lam * advantage
-            self.returns[step] = advantage + self.values[step]
-
+            self.returns[step] = advantage + val_with_last[step]
+            # a = self.returns.cpu().numpy()[...,0]
+            # b = self.rewards.cpu().numpy()[..., 0]
+            # c = self.values.cpu().numpy()[..., 0]
+            # d = self.dones.cpu().numpy()[..., 0]
+            # print()
         # Compute and normalize the advantages
         self.advantages = self.returns - self.values
         self.advantages = (self.advantages - self.advantages.mean()) / (self.advantages.std() + 1e-8)
@@ -71,6 +85,7 @@ class RolloutStorage:
             returns_batch = self.returns.view(-1, 1)[indices]
             old_actions_log_prob_batch = self.actions_log_prob.view(-1, 1)[indices]
             advantages_batch = self.advantages.view(-1, 1)[indices]
+            mask_batch = self.dones
             yield actor_obs_batch, critic_obs_batch, actions_batch, values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch
 
     def mini_batch_generator_inorder(self, num_mini_batches):
@@ -84,4 +99,5 @@ class RolloutStorage:
                 self.values.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
                 self.advantages.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
                 self.returns.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
-                self.actions_log_prob.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
+                self.actions_log_prob.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size],\
+                self.mask.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]

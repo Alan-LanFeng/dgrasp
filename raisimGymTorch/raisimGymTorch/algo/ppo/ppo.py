@@ -103,8 +103,10 @@ class PPO:
         mean_value_loss = 0
         mean_surrogate_loss = 0
         for epoch in range(self.num_learning_epochs):
-            for actor_obs_batch, critic_obs_batch, actions_batch, target_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
+            for actor_obs_batch, critic_obs_batch, actions_batch, target_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch,mask \
                     in self.batch_sampler(self.num_mini_batches):
+                mask = mask.squeeze(-1)
+                valid_sum = mask.sum()
 
                 actions_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, actions_batch)
                 value_batch = self.critic.evaluate(critic_obs_batch)
@@ -114,19 +116,20 @@ class PPO:
                 surrogate = -torch.squeeze(advantages_batch) * ratio
                 surrogate_clipped = -torch.squeeze(advantages_batch) * torch.clamp(ratio, 1.0 - self.clip_param,
                                                                                    1.0 + self.clip_param)
-                surrogate_loss = torch.max(surrogate, surrogate_clipped).mean()
-
+                surrogate_loss = torch.max(surrogate, surrogate_clipped)
+                surrogate_loss = (surrogate_loss*mask).sum()/valid_sum
                 # Value function loss
                 if self.use_clipped_value_loss:
                     value_clipped = target_values_batch + (value_batch - target_values_batch).clamp(-self.clip_param,
                                                                                                     self.clip_param)
                     value_losses = (value_batch - returns_batch).pow(2)
                     value_losses_clipped = (value_clipped - returns_batch).pow(2)
-                    value_loss = torch.max(value_losses, value_losses_clipped).mean()
+                    value_loss = torch.max(value_losses, value_losses_clipped)
+                    value_loss = (value_loss.squeeze(-1) * mask).sum() / valid_sum
                 else:
                     value_loss = (returns_batch - value_batch).pow(2).mean()
-
-                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
+                entropy_loss = (entropy_batch * mask).sum() / valid_sum
+                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_loss
 
                 # Gradient step
                 self.optimizer.zero_grad()

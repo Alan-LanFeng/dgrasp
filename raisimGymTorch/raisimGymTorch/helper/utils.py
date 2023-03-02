@@ -3,6 +3,7 @@ from raisimGymTorch.helper import rotations
 import argparse
 import open3d as o3d
 from scipy.spatial.transform import Rotation as R
+import torch
 
 IDX_TO_OBJ = {
     1: ['002_master_chef_can',0.414, 0, [0.051,0.139,0.0]],
@@ -35,6 +36,11 @@ def get_obj_pcd(path):
     obj_vertices = np.asarray(obj_vertices.points)
 
     return obj_vertices
+
+def first_nonzero(arr, axis, invalid_val=-1):
+    mask = arr!=0
+    mask = mask.to(torch.uint8)
+    return torch.where(mask.any(axis=axis), mask.argmax(axis=axis), invalid_val)
 
 def dgrasp_to_mano(param):
     eulers = param[:,6:].reshape(-1, 3)
