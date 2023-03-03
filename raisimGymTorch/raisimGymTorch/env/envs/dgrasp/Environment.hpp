@@ -88,7 +88,7 @@ namespace raisim {
             mano_->setGeneralizedCoordinate(Eigen::VectorXd::Zero(gcDim_));
 
             /// MUST BE DONE FOR ALL ENVIRONMENTS (CURRENTLY MANUALLY)
-            obDim_ =  279;
+            obDim_ =  282;
             obDouble_.setZero(obDim_);
 
             root_guided =  cfg["root_guided"].As<bool>();
@@ -269,7 +269,7 @@ namespace raisim {
                 Eigen::VectorXd gen_force;
                 gen_force.setZero(gcDim_);
                 mano_->setGeneralizedForce(gen_force);
-                
+
             }
 
         }
@@ -290,9 +290,7 @@ namespace raisim {
             mano_->setGeneralizedForce(gen_force);
 
             /// reset box position/orientation/velocity
-            //box->clearExternalForcesAndTorques();
-            world_->removeObject(box);
-            box = static_cast<raisim::Box*>(world_->addBox(2, 1, 0.5, 100, "", raisim::COLLISION(1)));
+            box->clearExternalForcesAndTorques();
             box->setPosition(1.25, 0, 0.25);
             box->setOrientation(1,0,0,0);
             box->setVelocity(0,0,0,0,0,0);
@@ -703,9 +701,11 @@ namespace raisim {
 
             /// compute relative target contact vector, i.e., which goal contacts are currently in contact
             rel_contacts_ = final_contact_array_.cwiseProduct(contacts_);
-
+            raisim::Vec<3> table_pos;
+            box->getPosition(0,table_pos);
             /// add all features to observation
-            obDouble_ << gc_,
+            obDouble_ <<
+                    gc_,
                     bodyLinearVel_,
                     bodyAngularVel_,
                     gv_.tail(gvDim_ - 6),
@@ -719,7 +719,8 @@ namespace raisim {
                     rel_contacts_,
                     rel_obj_pos_,
                     rel_body_table_pos_,
-                    obj_pose_.e();
+                    obj_pose_.e(),
+                    table_pos.e();
         }
 
         /// Set observation in wrapper to current observation

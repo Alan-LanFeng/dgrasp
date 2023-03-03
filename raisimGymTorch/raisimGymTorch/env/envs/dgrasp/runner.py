@@ -90,7 +90,7 @@ env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dump
 
 
 ### Setting dimensions from environments
-ob_dim = env.num_obs
+ob_dim = env.num_obs-3
 act_dim = env.num_acts
 
 ### Set training step parameters
@@ -125,7 +125,8 @@ for update in range(args.num_iterations):
 
         env.save_scaling(saver.data_dir, str(update))
 
-    next_obs,_ = env.reset()
+    next_obs,info = env.reset()
+    print(info['table_pos'][0])
     for step in range(n_steps):
         #obs = env.observe(get_obj_pcd=False).astype('float64')
         obs = next_obs
@@ -136,7 +137,7 @@ for update in range(args.num_iterations):
         ppo.step(value_obs=obs, rews=reward, dones=dones)
         done_sum = done_sum + np.sum(dones)
         reward_ll_sum = reward_ll_sum + np.sum(reward)
-    obs = env.observe().astype('float64')
+    obs,_ = env.observe()
 
     ### Update policy
     ppo.update(actor_obs=obs, value_obs=obs, log_this_iteration=update % 10 == 0, update=update)

@@ -81,7 +81,7 @@ set_target_properties(raisim::raisimODE PROPERTIES
 )
 
 # Create imported target raisim::raisim
-add_library(raisim::raisim SHARED IMPORTED)
+add_library(raisim::raisim SHARED IMPORTED ../../../../../raisimGymTorch/raisimGymTorch/env/debug_app.cpp)
 
 set_target_properties(raisim::raisim PROPERTIES
   INTERFACE_COMPILE_FEATURES "cxx_std_11"

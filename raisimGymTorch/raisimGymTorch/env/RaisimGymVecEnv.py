@@ -55,8 +55,8 @@ class RaisimGymVecEnv(gym.Env):
 
     def step(self, action):
         self.wrapper.step(action, self._reward, self._done)
-        obs = self.observe().astype('float64')
-        return obs, self._reward.copy(), self._done.copy(), None
+        obs,info = self.observe()
+        return obs, self._reward.copy(), self._done.copy(), info
 
     def load_scaling(self, dir_name, iteration, count=1e5):
         mean_file_name = dir_name + "/mean" + str(iteration) + ".csv"
@@ -92,6 +92,10 @@ class RaisimGymVecEnv(gym.Env):
             obs = np.concatenate([obs,obj_pcd],dim=-1)
             #hand_pcd = get_hand_mesh(gc,from_gc=True)
 
+        tablepos = obs[:,-3:]
+        obs = obs[:,:-3]
+        info = {}
+        info['table_pos'] = tablepos
 
         if self.normalize_ob:
             if update_mean:
@@ -99,7 +103,7 @@ class RaisimGymVecEnv(gym.Env):
 
             return self._normalize_observation(self._observation)
         else:
-            return obs.astype('float64')
+            return obs.astype('float64'), info
 
     def set_root_control(self):
         self.wrapper.set_root_control()
@@ -120,8 +124,7 @@ class RaisimGymVecEnv(gym.Env):
         ### Run episode rollouts
         self.reset_state(qpos_noisy_reset, np.zeros((num_envs, 51), 'float64'), obj_pose_reset)
 
-        obs = self.observe().astype('float64')
-        info = None
+        obs,info = self.observe()
         return obs, info
 
     def load_object(self, obj_idx, obj_weight, obj_dim, obj_type):
