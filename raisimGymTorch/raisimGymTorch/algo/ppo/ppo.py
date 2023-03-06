@@ -3,7 +3,7 @@ import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.tensorboard import SummaryWriter
+#from torch.utils.tensorboard import SummaryWriter
 from .storage import RolloutStorage
 import numpy as np
 
@@ -57,7 +57,7 @@ class PPO:
 
         # Log
         self.log_dir = os.path.join(log_dir, datetime.now().strftime('%b%d_%H-%M-%S'))
-        self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
+        #self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
         self.tot_timesteps = 0
         self.tot_time = 0
 
@@ -95,9 +95,9 @@ class PPO:
         self.tot_timesteps += self.num_transitions_per_env * self.num_envs
         mean_std = self.actor.distribution.std.mean()
 
-        self.writer.add_scalar('Loss/value_function', variables['mean_value_loss'], variables['it'])
-        self.writer.add_scalar('Loss/surrogate', variables['mean_surrogate_loss'], variables['it'])
-        self.writer.add_scalar('Policy/mean_noise_std', mean_std.item(), variables['it'])
+        # self.writer.add_scalar('Loss/value_function', variables['mean_value_loss'], variables['it'])
+        # self.writer.add_scalar('Loss/surrogate', variables['mean_surrogate_loss'], variables['it'])
+        # self.writer.add_scalar('Policy/mean_noise_std', mean_std.item(), variables['it'])
 
     def _train_step(self):
         mean_value_loss = 0
