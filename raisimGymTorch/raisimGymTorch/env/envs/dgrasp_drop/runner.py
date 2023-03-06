@@ -82,7 +82,7 @@ cfg["testing"] = True if args.test else False
 print('num envs', num_envs)
 
 # get obj pcd
-mesh_path = "/local/home/lafeng/Desktop/raisim/raisim_grasp/rsc/meshes_simplified/008_pudding_box/mesh_aligned.obj"
+mesh_path = "../rsc/meshes_simplified/008_pudding_box/mesh_aligned.obj"
 obj_pcd = get_obj_pcd(mesh_path)
 obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], num_envs, 0)
 
