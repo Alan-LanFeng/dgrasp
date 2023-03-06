@@ -790,7 +790,7 @@ namespace raisim {
 
             if (height_diff>0.05)
             {
-                terminalReward = -50;
+                terminalReward = -5;
                 return true;
             }
 //            if (time_step>190)

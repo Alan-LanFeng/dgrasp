@@ -10,6 +10,7 @@ import raisimGymTorch.algo.ppo.ppo as PPO
 import torch.nn as nn
 import numpy as np
 import torch
+import wandb
 
 import joblib
 
@@ -44,8 +45,9 @@ def get_ppo():
 
 
 ### configuration of command line arguments
-args = get_args()
 
+
+args = get_args()
 setup_seed(args.seed)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -60,6 +62,7 @@ print(f"Experiment name: \"{args.exp_name}\"")
 
 ### load config
 cfg = YAML().load(open(task_path+'/cfgs/' + args.cfg, 'r'))
+wandb.init(project='dgrasp',config=cfg)
 
 ### set seed
 if args.seed != 1:
@@ -88,7 +91,6 @@ obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], num_envs, 0)
 
 env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'],label=repeated_label,obj_pcd=obj_pcd)
 
-
 ### Setting dimensions from environments
 ob_dim = env.num_obs-3
 act_dim = env.num_acts
@@ -97,7 +99,6 @@ act_dim = env.num_acts
 grasp_steps = pre_grasp_steps
 n_steps = grasp_steps  + trail_steps
 total_steps = n_steps * env.num_envs
-
 
 ### Set up logging
 saver = ConfigurationSaver(log_dir = exp_path + "/raisimGymTorch/" + args.storedir + "/" + args.exp_name,
@@ -138,6 +139,7 @@ for update in range(args.num_iterations):
     obs,_ = env.observe()
 
     ### Update policy
+    success_rate = (num_envs-done_sum)/num_envs
     ppo.update(actor_obs=obs, value_obs=obs, log_this_iteration=update % 10 == 0, update=update)
     average_ll_performance = reward_ll_sum / total_steps
     average_dones = done_sum / total_steps
@@ -150,10 +152,15 @@ for update in range(args.num_iterations):
     mean_file_name = saver.data_dir + "/rewards.txt"
     np.savetxt(mean_file_name, avg_rewards)
 
+    results = {}
+    results['rewards'] = average_ll_performance
+    results['success_rate'] = success_rate
+    wandb.log(results)
+
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))
     print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(average_ll_performance)))
-    print('{:<40} {:>6}'.format("dones: ", '{:0.6f}'.format(average_dones)))
+    print('{:<40} {:>6}'.format("success_rate: ", '{:0.6f}'.format(success_rate)))
     print('{:<40} {:>6}'.format("time elapsed in this iteration: ", '{:6.4f}'.format(end - start)))
     print('{:<40} {:>6}'.format("fps: ", '{:6.0f}'.format(total_steps / (end - start))))
     print('{:<40} {:>6}'.format("real time factor: ", '{:6.0f}'.format(total_steps / (end - start)
