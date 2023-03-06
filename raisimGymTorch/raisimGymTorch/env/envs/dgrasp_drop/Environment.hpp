@@ -790,14 +790,14 @@ namespace raisim {
 
             if (height_diff>0.05)
             {
-                terminalReward = -1;
+                terminalReward = -50;
                 return true;
             }
-            if (time_step>190)
-            {
-                terminalReward = 1;
-                return true;
-            }
+//            if (time_step>190)
+//            {
+//                terminalReward = 10;
+//                return true;
+//            }
 
             return false;
         }
