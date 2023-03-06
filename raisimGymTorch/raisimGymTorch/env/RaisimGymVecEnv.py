@@ -2,14 +2,13 @@
 # // This file is part of RaiSim//
 # // Copyright 2020, RaiSim Tech//
 # //----------------------------//
-import gym
 import numpy as np
 import platform
 import os
 import copy
 from scipy.spatial.transform import Rotation as R
 
-class RaisimGymVecEnv(gym.Env):
+class RaisimGymVecEnv:
 
     def __init__(self, impl, cfg, normalize_ob=False, seed=0, normalize_rew=True, clip_obs=10.,label=None, obj_pcd=None):
         if platform.system() == "Darwin":
@@ -110,7 +109,7 @@ class RaisimGymVecEnv(gym.Env):
 
     def reset(self,seed=None,option=None):
         ### Add some noise to initial hand position
-        super().reset(seed=seed)
+        #super().reset(seed=seed)
 
         qpos_reset = self.label['qpos_reset'].copy()
         obj_pose_reset = self.label['obj_pose_reset'].copy()
