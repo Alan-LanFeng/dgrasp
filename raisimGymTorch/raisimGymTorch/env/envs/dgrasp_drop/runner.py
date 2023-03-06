@@ -139,7 +139,7 @@ for update in range(args.num_iterations):
     obs,_ = env.observe()
 
     ### Update policy
-    success_rate = (num_envs-done_sum)/num_envs
+    success_rate = max((num_envs-done_sum)/num_envs,0)
     ppo.update(actor_obs=obs, value_obs=obs, log_this_iteration=update % 10 == 0, update=update)
     average_ll_performance = reward_ll_sum / total_steps
     average_dones = done_sum / total_steps

@@ -416,7 +416,7 @@ namespace raisim {
         /// This function takes an environment step given an action (51DoF) input
         float step(const Eigen::Ref<EigenVecDouble>& action) final {
             time_step++;
-            if (time_step>150)
+            if (time_step>60)
             {
                 box->setPosition(1.25,0,0.0);
             }
@@ -543,7 +543,6 @@ namespace raisim {
             root_pose_reward_ = -rel_pose_.head(3).squaredNorm();
             pos_reward_ = -rel_body_pos_.cwiseProduct(finger_weights_).squaredNorm();
             obj_reward_ = -rel_obj_pos_.norm();
-            contact_pos_reward_ =  rel_contact_pos_.squaredNorm();
 
             /// Compute regularization rewards
             rel_obj_reward_ = rel_obj_vel.squaredNorm();
@@ -560,10 +559,8 @@ namespace raisim {
             rewards_.record("root_pos_reward_", std::max(-10.0, root_pos_reward_));
             rewards_.record("root_pose_reward_", std::max(-10.0, root_pose_reward_));
             rewards_.record("pose_reward", std::max(-10.0, pose_reward_));
-            rewards_.record("contact_pos_reward", std::max(-10.0, contact_pos_reward_));
             rewards_.record("contact_reward", std::max(-10.0, contact_reward_));
             rewards_.record("obj_reward", std::max(-10.0, obj_reward_));
-            rewards_.record("obj_pose_reward_", std::max(-10.0,obj_pose_reward_));
             rewards_.record("impulse_reward", std::min(impulse_reward_, obj_weight_*5));
             rewards_.record("rel_obj_reward_", std::max(0.0, rel_obj_reward_));
             rewards_.record("body_vel_reward_", std::max(0.0,body_vel_reward_));
@@ -790,7 +787,7 @@ namespace raisim {
 
             if (height_diff>0.05)
             {
-                terminalReward = -5;
+                terminalReward = -1;
                 return true;
             }
 //            if (time_step>190)
