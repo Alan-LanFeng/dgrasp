@@ -41,6 +41,21 @@ class RolloutStorage:
         self.step = 0
 
     def compute_returns(self, last_values, gamma, lam):
+        # path_slice = slice(self.path_start_idx, self.ptr)
+        # rews = np.append(self.rew_buf[path_slice], last_val)
+        # vals = np.append(self.val_buf[path_slice], last_val)
+
+        # rews = self.rewards[:64,0,0].cpu().numpy()
+        # vals = self.values[:64,0,0].cpu().numpy()
+        # rews = np.append(rews, 0)
+        # vals = np.append(vals, 0)
+        #
+        # # the next two lines implement GAE-Lambda advantage calculation
+        # deltas = rews[:-1] + gamma * vals[1:] - vals[:-1]
+        # adv = discount_cumsum(deltas, gamma * lam)
+        # # the next line computes rewards-to-go, to be targets for the value function
+        # ret =discount_cumsum(rews, gamma)[:-1]
+
         advantage = 0
         # self.dones[-3,0]=1
         # self.dones[-2,0]=1

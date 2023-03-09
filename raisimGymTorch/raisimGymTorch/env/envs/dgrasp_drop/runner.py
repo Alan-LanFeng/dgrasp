@@ -2,7 +2,7 @@ from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin import dgrasp_drop as mano
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
-from raisimGymTorch.helper.utils import get_obj_pcd,get_args,repeat_label
+from raisimGymTorch.helper.utils import get_obj_pcd,get_args,repeat_label,setup_seed
 import os
 import time
 import raisimGymTorch.algo.ppo.module as ppo_module
@@ -14,12 +14,7 @@ import wandb
 
 import joblib
 
-def setup_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
-    #random.seed(seed)
-    torch.backends.cudnn.deterministic = True
+
 
 def get_ppo():
     actor = ppo_module.Actor(
@@ -45,7 +40,6 @@ def get_ppo():
 
 
 ### configuration of command line arguments
-
 
 args = get_args()
 setup_seed(args.seed)
@@ -107,6 +101,7 @@ saver = ConfigurationSaver(log_dir = exp_path + "/raisimGymTorch/" + args.stored
 ppo = get_ppo()
 
 avg_rewards = []
+eval_interval = 200
 for update in range(args.num_iterations):
     start = time.time()
     reward_ll_sum = 0
@@ -126,20 +121,21 @@ for update in range(args.num_iterations):
         env.save_scaling(saver.data_dir, str(update))
 
     next_obs,info = env.reset()
+    done_array = np.zeros(num_envs)
     for step in range(n_steps):
-        #obs = env.observe(get_obj_pcd=False).astype('float64')
+
         obs = next_obs
         action = ppo.observe(obs)
         next_obs,reward, dones,_ = env.step(action.astype('float64'))
+        done_array+=dones
         reward.clip(min=reward_clip)
-
         ppo.step(value_obs=obs, rews=reward, dones=dones)
-        done_sum = done_sum + np.sum(dones)
         reward_ll_sum = reward_ll_sum + np.sum(reward)
     obs,_ = env.observe()
 
     ### Update policy
-    success_rate = max((num_envs-done_sum)/num_envs,0)
+    success_rate = (num_envs - done_array.astype(bool).sum())/num_envs
+
     ppo.update(actor_obs=obs, value_obs=obs, log_this_iteration=update % 10 == 0, update=update)
     average_ll_performance = reward_ll_sum / total_steps
     average_dones = done_sum / total_steps

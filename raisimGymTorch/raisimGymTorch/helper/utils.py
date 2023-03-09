@@ -4,6 +4,8 @@ import argparse
 import open3d as o3d
 from scipy.spatial.transform import Rotation as R
 import torch
+import random
+import os
 
 IDX_TO_OBJ = {
     1: ['002_master_chef_can',0.414, 0, [0.051,0.139,0.0]],
@@ -28,6 +30,15 @@ IDX_TO_OBJ = {
     20: ['052_extra_large_clamp', 0.102,2, [0.0,0.0,0.0]],
     21: ['061_foam_brick', 0.028, 1, [0.05, 0.075, 0.05]],
 }
+
+def setup_seed(seed):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 def get_obj_pcd(path):
     mesh = o3d.io.read_triangle_mesh(path, enable_post_processing=True)

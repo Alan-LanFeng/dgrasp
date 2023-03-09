@@ -165,7 +165,7 @@ class VectorizedEnvironment {
 
     if (done[agentId]) {
       environments_[agentId]->reset();
-      reward[agentId] += terminalReward;
+      reward[agentId] = terminalReward;
     }
   }
 

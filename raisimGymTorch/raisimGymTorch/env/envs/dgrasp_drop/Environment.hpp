@@ -416,10 +416,10 @@ namespace raisim {
         /// This function takes an environment step given an action (51DoF) input
         float step(const Eigen::Ref<EigenVecDouble>& action) final {
             time_step++;
-            if (time_step>60)
-            {
-                box->setPosition(1.25,0,0.0);
-            }
+//            if (time_step>60)
+//            {
+//                box->setPosition(1.25,0,0.0);
+//            }
             if (visualizable_) {
                 table_top->setPosition(1.25, 0, 0.225);
                 leg1->setPosition(0.2625, 0.4875, -0.015);
@@ -785,11 +785,11 @@ namespace raisim {
 
             height_diff = obj_pos_init_[2]-Obj_Position[2];
 
-            if (height_diff>0.05)
-            {
-                terminalReward = -1;
-                return true;
-            }
+//            if (height_diff>0.05)
+//            {
+//                terminalReward = -5 + rewards_.sum() ;
+//                return true;
+//            }
 //            if (time_step>190)
 //            {
 //                terminalReward = 10;
