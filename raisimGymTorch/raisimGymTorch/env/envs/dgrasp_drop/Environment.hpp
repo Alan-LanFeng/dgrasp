@@ -699,9 +699,10 @@ namespace raisim {
             }
 
             /// compute relative target contact vector, i.e., which goal contacts are currently in contact
-            //rel_contacts_ = final_contact_array_.cwiseProduct(contacts_);
-            //raisim::Vec<3> table_pos;
-            //box->getPosition(0,table_pos);
+            rel_contacts_ = final_contact_array_.cwiseProduct(contacts_);
+
+//            raisim::Vec<3> table_pos;
+//            box->getPosition(0,table_pos);
             /// add all features to observation
             obDouble_ <<
                     gc_,
