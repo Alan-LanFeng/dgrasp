@@ -102,7 +102,7 @@ class RaisimGymVecEnv:
 
             return self._normalize_observation(self._observation)
         else:
-            return obs.astype('float64'), info
+            return obs.astype('float32'), info
 
     def set_root_control(self):
         self.wrapper.set_root_control()
@@ -121,7 +121,7 @@ class RaisimGymVecEnv:
         qpos_noisy_reset[:, 3:] += random_noise_qpos[:, :]
 
         ### Run episode rollouts
-        self.reset_state(qpos_noisy_reset, np.zeros((num_envs, 51), 'float64'), obj_pose_reset)
+        self.reset_state(qpos_noisy_reset, np.zeros((num_envs, 51), 'float32'), obj_pose_reset)
 
         obs,info = self.observe()
         return obs, info

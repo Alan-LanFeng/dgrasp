@@ -3,6 +3,7 @@ from raisimGymTorch.env.bin import dgrasp_drop as mano
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
 from raisimGymTorch.helper.utils import get_obj_pcd,get_args,repeat_label,setup_seed
+from raisimGymTorch.env.bin.dgrasp_drop import NormalSampler
 import os
 import time
 import raisimGymTorch.algo.ppo.module as ppo_module
@@ -15,14 +16,12 @@ import wandb
 import joblib
 
 
-
 def get_ppo():
-    actor = ppo_module.Actor(
-        ppo_module.MLP(cfg['architecture']['policy_net'], nn.Tanh, nn.LeakyReLU, ob_dim, act_dim, False),
-        ppo_module.MultivariateGaussianDiagonalCovariance(act_dim, 1.0), device)
+    actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['policy_net'], nn.LeakyReLU, ob_dim, act_dim),
+                             ppo_module.MultivariateGaussianDiagonalCovariance(act_dim, num_envs, 1.0,
+                                                                               NormalSampler(act_dim)), device)
 
-    critic = ppo_module.Critic(
-        ppo_module.MLP(cfg['architecture']['value_net'], nn.Tanh, nn.LeakyReLU, ob_dim, 1, False), device)
+    critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['value_net'], nn.LeakyReLU, ob_dim, 1), device)
 
     ppo = PPO.PPO(actor=actor,
                   critic=critic,
@@ -45,7 +44,7 @@ args = get_args()
 setup_seed(args.seed)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-torch.set_default_dtype(torch.double)
+
 task_path = os.path.dirname(os.path.realpath(__file__))
 home_path = task_path + "/../../../../.."
 exp_path = home_path
@@ -125,8 +124,8 @@ for update in range(args.num_iterations):
     for step in range(n_steps):
 
         obs = next_obs
-        action = ppo.observe(obs)
-        next_obs,reward, dones,_ = env.step(action.astype('float64'))
+        action = ppo.act(obs)
+        next_obs,reward, dones,_ = env.step(action.astype('float32'))
         done_array+=dones
         reward.clip(min=reward_clip)
         ppo.step(value_obs=obs, rews=reward, dones=dones)

@@ -49,6 +49,7 @@ def get_obj_pcd(path):
     return obj_vertices
 
 def first_nonzero(arr, axis, invalid_val=-1):
+    arr = torch.Tensor(arr)
     mask = arr!=0
     mask = mask.to(torch.uint8)
     return torch.where(mask.any(axis=axis), mask.argmax(axis=axis), invalid_val)
@@ -92,7 +93,11 @@ def get_args():
 def repeat_label(label_dict, num_repeats):
     ret = {}
     for k,v in label_dict.items():
-        ret[k] = np.repeat(v,num_repeats,0)
+        if 'type' in k or 'idx' in k:
+            ret[k] = np.repeat(v, num_repeats, 0)
+        else:
+            ret[k] = np.repeat(v,num_repeats,0).astype('float32')
+
     return ret
 
 def euler_noise_to_quat(quats, palm_pose, noise):

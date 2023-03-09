@@ -14,7 +14,7 @@ class RolloutStorage:
         self.rewards = np.zeros([num_transitions_per_env, num_envs, 1], dtype=np.float32)
         self.actions = np.zeros([num_transitions_per_env, num_envs, *actions_shape], dtype=np.float32)
         self.dones = np.zeros([num_transitions_per_env, num_envs, 1], dtype=np.bool)
-        self.mask = torch.ones(num_transitions_per_env, num_envs, 1).bool().to(self.device)
+        self.mask = np.ones([num_transitions_per_env, num_envs, 1],dtype=np.bool)
         # For PPO
         self.actions_log_prob = np.zeros([num_transitions_per_env, num_envs, 1], dtype=np.float32)
         self.values = np.zeros([num_transitions_per_env, num_envs, 1], dtype=np.float32)
@@ -61,7 +61,7 @@ class RolloutStorage:
             self.values = critic.predict(torch.from_numpy(self.critic_obs).to(self.device)).cpu().numpy()
 
         advantage = 0
-        val_with_last = torch.cat([self.values,last_values.unsqueeze(0)],dim=0)
+        val_with_last = np.concatenate([self.values,last_values.unsqueeze(0).cpu().numpy()],axis=0)
         a = first_nonzero(self.dones[...,0],0)
         for i in range(len(a)):
             if a[i]==-1:continue
@@ -72,7 +72,7 @@ class RolloutStorage:
             self.dones[indx:, i] = 1
         for step in reversed(range(self.num_transitions_per_env)):
             next_values = val_with_last[step + 1]
-            next_is_not_terminal = 1.0 - self.dones[step].float()
+            next_is_not_terminal = 1.0 - self.dones[step]
             delta = self.rewards[step] + next_is_not_terminal * gamma * next_values - val_with_last[step]
             advantage = delta + next_is_not_terminal * gamma * lam * advantage
             self.returns[step] = advantage + val_with_last[step]
@@ -91,6 +91,7 @@ class RolloutStorage:
         self.advantages_tc = torch.from_numpy(self.advantages).to(self.device)
         self.sigma_tc = torch.from_numpy(self.sigma).to(self.device)
         self.mu_tc = torch.from_numpy(self.mu).to(self.device)
+        self.mask_tc = torch.from_numpy(self.mask).to(self.device)
 
     def mini_batch_generator_shuffle(self, num_mini_batches):
         batch_size = self.num_envs * self.num_transitions_per_env
@@ -123,4 +124,4 @@ class RolloutStorage:
                 self.advantages_tc.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
                 self.returns_tc.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
                 self.actions_log_prob_tc.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size],\
-                self.mask.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
+                self.mask_tc.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
