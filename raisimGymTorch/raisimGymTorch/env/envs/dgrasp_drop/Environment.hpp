@@ -280,6 +280,7 @@ namespace raisim {
 
             /// reset gains (only required in case for inference)
             time_step=0;
+            epoch_step++;
             Eigen::VectorXd jointPgain(gvDim_), jointDgain(gvDim_);
             jointPgain.head(3).setConstant(50);
             jointDgain.head(3).setConstant(0.1);
@@ -417,6 +418,7 @@ namespace raisim {
         /// This function takes an environment step given an action (51DoF) input
         float step(const Eigen::Ref<EigenVec>& action) final {
             time_step++;
+
             raisim::Vec<4> obj_orientation_quat, quat_final_pose, quat_world;
             raisim::Mat<3, 3> rot, rot_trans, rot_world, rot_goal, rotmat_final_obj_pos, rotmat_final_obj_pos_trans;
             raisim::Vec<3> obj_pos_raisim, euler_goal_world, final_obj_pose_mat, hand_pos_world, hand_pose, act_pos, act_or_pose;
@@ -557,7 +559,7 @@ namespace raisim {
             rewards_.record("body_qvel_reward_", std::max(0.0,body_qvel_reward_));
             rewards_.record("torque", std::max(0.0, mano_->getGeneralizedForce().squaredNorm()));
 
-            return rewards_.sum();
+            return (1-std::min(epoch_step/1000,1))*rewards_.sum();
         }
 
         /// This function computes and updates the observation/state space
@@ -776,16 +778,18 @@ namespace raisim {
 
             height_diff = obj_pos_init_[2]-Obj_Position[2];
 
-//            if (height_diff>0.05)
-//            {
-//                terminalReward = -5 + rewards_.sum() ;
-//                return true;
-//            }
-//            if (time_step>190)
-//            {
-//                terminalReward = 10;
-//                return true;
-//            }
+            if (height_diff>0.03)
+            {
+                terminalReward = -1 + (1-std::min(epoch_step/1000,1))*rewards_.sum() ;
+                return true;
+            }
+
+            if (time_step==80)
+            {
+                terminalReward = 1 + (1-std::min(epoch_step/1000,1))*rewards_.sum() ;
+                return true;
+            }
+
 
             return false;
         }
@@ -834,6 +838,7 @@ namespace raisim {
         int root_guiding_counter_ = 0;
         int obj_idx_;
         int time_step;
+        int epoch_step=0;
         bool root_guided=false;
         bool cylinder_mesh=false;
         bool box_obj_mesh=false;

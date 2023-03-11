@@ -24,7 +24,7 @@ environment:
   finger_action_std: 0.015
   rot_action_std: 0.01
   pre_grasp_steps: 60
-  trail_steps: 135
+  trail_steps: 20
   reward_clip: -2.0
   reward:
     pos_reward:

@@ -109,6 +109,7 @@ for update in range(args.num_iterations):
 
     ### Store policy
     if update % cfg['environment']['eval_every_n'] == 0:
+
         print("Visualizing and evaluating the current policy")
         torch.save({
             'actor_architecture_state_dict': ppo.actor.architecture.state_dict(),
@@ -118,6 +119,12 @@ for update in range(args.num_iterations):
         }, saver.data_dir+"/full_"+str(update)+'.pt')
 
         env.save_scaling(saver.data_dir, str(update))
+        pathes = saver.data_dir.split('/')
+        sd = pathes[-3]
+        exp = pathes[-2]
+        weight = pathes[-1]+ "/full_" + str(update) + '.pt'
+        os.system(
+            f'python raisimGymTorch/env/envs/dgrasp_test/runner.py -o  7 -e {exp} -w {weight} -sd {sd} -t')
 
     next_obs,info = env.reset()
     done_array = np.zeros(num_envs)
