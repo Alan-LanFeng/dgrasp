@@ -12,8 +12,24 @@ import torch.nn as nn
 import numpy as np
 import torch
 import wandb
+import math
 
 import joblib
+
+class PE():
+    """
+    Implement the PE function.
+    """
+    def __init__(self, d_model, max_len=5000):
+        # Compute the positional encodings once in log space.
+        pe = np.zeros([max_len, d_model])
+        position = np.arange(0, max_len)[:,np.newaxis].astype(np.float32)
+        div_term = np.exp(np.arange(0, d_model, 2).astype(np.float32) * -(math.log(10000.0) / d_model))
+        pe[:, 0::2] = np.sin(position * div_term)
+        pe[:, 1::2] = np.cos(position * div_term)[:,:-1]
+        self.pe = pe.astype(np.float32)
+    def add(self,obs,step):
+        return obs+ self.pe[[step]]
 
 
 def get_ppo():
@@ -85,7 +101,7 @@ obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], num_envs, 0)
 env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'],label=repeated_label,obj_pcd=obj_pcd)
 
 ### Setting dimensions from environments
-ob_dim = env.num_obs-3
+ob_dim = env.num_obs+1
 act_dim = env.num_acts
 
 ### Set training step parameters
@@ -101,6 +117,8 @@ ppo = get_ppo()
 
 avg_rewards = []
 eval_interval = 200
+#pe = PE(ob_dim,n_steps)
+
 for update in range(args.num_iterations):
     start = time.time()
     reward_ll_sum = 0
@@ -108,7 +126,7 @@ for update in range(args.num_iterations):
     average_dones = 0.
 
     ### Store policy
-    if update % cfg['environment']['eval_every_n'] == 0:
+    if update % cfg['environment']['eval_every_n'] == 0 and update:
         print("Visualizing and evaluating the current policy")
         torch.save({
             'actor_architecture_state_dict': ppo.actor.architecture.state_dict(),
@@ -118,12 +136,22 @@ for update in range(args.num_iterations):
         }, saver.data_dir+"/full_"+str(update)+'.pt')
 
         env.save_scaling(saver.data_dir, str(update))
+        pathes = saver.data_dir.split('/')
+        sd = pathes[-3]
+        exp = pathes[-2]
+        weight = pathes[-1]+ "/full_" + str(update) + '.pt'
+        os.system(
+            f'python raisimGymTorch/env/envs/dgrasp_test/runner.py -o  7 -e {exp} -w {weight} -sd {sd} -t')
 
     next_obs,info = env.reset()
     done_array = np.zeros(num_envs)
     for step in range(n_steps):
 
         obs = next_obs
+        step_obs = np.zeros([num_envs,1]).astype('float32')
+        step_obs[:] = step/n_steps
+        obs = np.concatenate([obs,step_obs],axis=1)
+        #obs = pe.add(obs,step)
         action = ppo.act(obs)
         next_obs,reward, dones,_ = env.step(action.astype('float32'))
         done_array+=dones
@@ -131,7 +159,9 @@ for update in range(args.num_iterations):
         ppo.step(value_obs=obs, rews=reward, dones=dones)
         reward_ll_sum = reward_ll_sum + np.sum(reward)
     obs,_ = env.observe()
-
+    step_obs = np.zeros([num_envs, 1]).astype('float32')
+    step_obs[:] = (step+1) / n_steps
+    obs = np.concatenate([obs, step_obs], axis=1)
     ### Update policy
     success_rate = (num_envs - done_array.astype(bool).sum())/num_envs
 
@@ -152,15 +182,15 @@ for update in range(args.num_iterations):
     results['success_rate'] = success_rate
     wandb.log(results)
 
-    print('----------------------------------------------------')
-    print('{:>6}th iteration'.format(update))
-    print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(average_ll_performance)))
-    print('{:<40} {:>6}'.format("success_rate: ", '{:0.6f}'.format(success_rate)))
-    print('{:<40} {:>6}'.format("time elapsed in this iteration: ", '{:6.4f}'.format(end - start)))
-    print('{:<40} {:>6}'.format("fps: ", '{:6.0f}'.format(total_steps / (end - start))))
-    print('{:<40} {:>6}'.format("real time factor: ", '{:6.0f}'.format(total_steps / (end - start)
-                                                                       * cfg['environment']['control_dt'])))
-    print('std: ')
-    print(np.exp(ppo.actor.distribution.std.cpu().detach().numpy()))
-    print('----------------------------------------------------\n')
+    # print('----------------------------------------------------')
+    # print('{:>6}th iteration'.format(update))
+    # print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(average_ll_performance)))
+    # print('{:<40} {:>6}'.format("success_rate: ", '{:0.6f}'.format(success_rate)))
+    # print('{:<40} {:>6}'.format("time elapsed in this iteration: ", '{:6.4f}'.format(end - start)))
+    # print('{:<40} {:>6}'.format("fps: ", '{:6.0f}'.format(total_steps / (end - start))))
+    # print('{:<40} {:>6}'.format("real time factor: ", '{:6.0f}'.format(total_steps / (end - start)
+    #                                                                    * cfg['environment']['control_dt'])))
+    # print('std: ')
+    # print(np.exp(ppo.actor.distribution.std.cpu().detach().numpy()))
+    # print('----------------------------------------------------\n')
 

@@ -13,31 +13,23 @@ import torch
 import datetime
 import argparse
 import joblib
+import math
 
+# class PE():
+#     """
+#     Implement the PE function.
+#     """
+#     def __init__(self, d_model, max_len=5000):
+#         # Compute the positional encodings once in log space.
+#         pe = np.zeros([max_len, d_model])
+#         position = np.arange(0, max_len)[:,np.newaxis].astype(np.float32)
+#         div_term = np.exp(np.arange(0, d_model, 2).astype(np.float32) * -(math.log(10000.0) / d_model))
+#         pe[:, 0::2] = np.sin(position * div_term)
+#         pe[:, 1::2] = np.cos(position * div_term)[:,:-1]
+#         self.pe = pe.astype(np.float32)
+#     def add(self,obs,step):
+#         return obs+ self.pe[[step]]
 
-IDX_TO_OBJ = {
-    1: ['002_master_chef_can',0.414, 0, [0.051,0.139,0.0]],
-    2: ['003_cracker_box', 0.453, 1, [0.06, 0.158, 0.21]],
-    3: ['004_sugar_box', 0.514, 1, [0.038, 0.089, 0.175]],
-    4: ['005_tomato_soup_can', 0.349, 0, [0.033, 0.101,0.0]],
-    5: ['006_mustard_bottle', 0.431,2, [0.0,0.0,0.0]],
-    6: ['007_tuna_fish_can', 0.171, 0, [0.0425, 0.033,0.0]],
-    7: ['008_pudding_box', 0.187, 3, [0.21, 0.089, 0.035]],
-    8: ['009_gelatin_box', 0.097, 3, [0.028, 0.085, 0.073]],
-    9: ['010_potted_meat_can', 0.37, 3, [0.05, 0.097, 0.089]],
-    10: ['011_banana', 0.066,2, [0.028, 0.085, 0.073]],
-    11: ['019_pitcher_base', 0.178,2, [0.0,0.0,0.0]],
-    12: ['021_bleach_cleanser', 0.302,2, [0.0,0.0,0.0]], # not sure about weight here
-    13: ['024_bowl', 0.147,2, [0.0,0.0,0.0]],
-    14: ['025_mug', 0.118,2, [0.0,0.0,0.0]],
-    15: ['035_power_drill', 0.895,2, [0.0,0.0,0.0]],
-    16: ['036_wood_block', 0.729, 3, [0.085, 0.085, 0.2]],
-    17: ['037_scissors', 0.082,2, [0.0,0.0,0.0]],
-    18: ['040_large_marker', 0.01, 3, [0.009,0.121,0.0]],
-    19: ['051_large_clamp', 0.125,2, [0.0,0.0,0.0]],
-    20: ['052_extra_large_clamp', 0.102,2, [0.0,0.0,0.0]],
-    21: ['061_foam_brick', 0.028, 1, [0.05, 0.075, 0.05]],
-}
 
 ### configuration of command line arguments
 parser = argparse.ArgumentParser()
@@ -61,6 +53,8 @@ parser.add_argument('-nr','--num_repeats', type=int, default=1)
 args = parser.parse_args()
 mode = args.mode
 weight_path = args.weight
+
+# pe = PE(279,195)
 
 print(f"Configuration file: \"{args.cfg}\"")
 print(f"Experiment name: \"{args.exp_name}\"")
@@ -181,7 +175,7 @@ env.load_object(obj_idx_stacked,obj_w_stacked, obj_dim_stacked, obj_type_stacked
 
 # Setting dimensions from environments
 n_act = final_qpos[0].shape[0]
-ob_dim = env.num_obs
+ob_dim = env.num_obs+1
 act_dim = env.num_acts
 
 ### Set training step parameters
@@ -265,7 +259,7 @@ if args.vis_evaluate:
             env.load_object(obj_idx_stacked,obj_w_stacked, obj_dim_stacked, obj_type_stacked)
 
         env.set_goals(final_obj_pos_seq,final_ee_seq,final_pose_seq,final_contact_pos_seq,final_contacts_seq)
-        env.reset_state(qpos_reset_seq, np.zeros((num_envs,51)), obj_pose_reset_seq)
+        env.reset_state(qpos_reset_seq, np.zeros((num_envs,51),dtype=np.float32), obj_pose_reset_seq)
 
         set_guide=False
         obj_pose_pos_list = []
@@ -310,8 +304,12 @@ else:
 
     for step in range(n_steps):
         obs = env.observe(False)
-
-        action_ll = actor.architecture.architecture(torch.from_numpy(obs[:,:-4]).to(device))
+        obs = obs[:, :-4]
+        step_obs = np.zeros([num_envs,1]).astype('float32')
+        step_obs[:] = step/n_steps
+        obs = np.concatenate([obs,step_obs],axis=1)
+        #obs = pe.add(obs,step)
+        action_ll = actor.architecture.architecture(torch.from_numpy(obs).to(device))
         frame_start = time.time()
 
         ### After grasp is established remove surface and test stability
