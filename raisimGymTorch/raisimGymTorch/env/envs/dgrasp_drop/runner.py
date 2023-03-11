@@ -12,8 +12,24 @@ import torch.nn as nn
 import numpy as np
 import torch
 import wandb
+import math
 
 import joblib
+
+class PE():
+    """
+    Implement the PE function.
+    """
+    def __init__(self, d_model, max_len=5000):
+        # Compute the positional encodings once in log space.
+        pe = np.zeros([max_len, d_model])
+        position = np.arange(0, max_len)[:,np.newaxis].astype(np.float32)
+        div_term = np.exp(np.arange(0, d_model, 2).astype(np.float32) * -(math.log(10000.0) / d_model))
+        pe[:, 0::2] = np.sin(position * div_term)
+        pe[:, 1::2] = np.cos(position * div_term)[:,:-1]
+        self.pe = pe.astype(np.float32)
+    def add(self,obs,step):
+        return obs+ self.pe[[step]]
 
 
 def get_ppo():
@@ -85,7 +101,7 @@ obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], num_envs, 0)
 env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'],label=repeated_label,obj_pcd=obj_pcd)
 
 ### Setting dimensions from environments
-ob_dim = env.num_obs-3
+ob_dim = env.num_obs
 act_dim = env.num_acts
 
 ### Set training step parameters
@@ -101,6 +117,8 @@ ppo = get_ppo()
 
 avg_rewards = []
 eval_interval = 200
+pe = PE(ob_dim,n_steps)
+
 for update in range(args.num_iterations):
     start = time.time()
     reward_ll_sum = 0
@@ -109,7 +127,6 @@ for update in range(args.num_iterations):
 
     ### Store policy
     if update % cfg['environment']['eval_every_n'] == 0:
-
         print("Visualizing and evaluating the current policy")
         torch.save({
             'actor_architecture_state_dict': ppo.actor.architecture.state_dict(),
@@ -131,6 +148,7 @@ for update in range(args.num_iterations):
     for step in range(n_steps):
 
         obs = next_obs
+        obs = pe.add(obs,step)
         action = ppo.act(obs)
         next_obs,reward, dones,_ = env.step(action.astype('float32'))
         done_array+=dones

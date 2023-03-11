@@ -91,11 +91,11 @@ class RaisimGymVecEnv:
             obs = np.concatenate([obs,obj_pcd],dim=-1)
             #hand_pcd = get_hand_mesh(gc,from_gc=True)
 
-        tablepos = obs[:,-3:]
-        obs = obs[:,:-3]
+        # tablepos = obs[:,-3:]
+        # obs = obs[:,:-3]
+        # info = {}
+        # info['table_pos'] = tablepos
         info = {}
-        info['table_pos'] = tablepos
-
         if self.normalize_ob:
             if update_mean:
                 self.obs_rms.update(self._observation)

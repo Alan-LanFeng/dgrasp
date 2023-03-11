@@ -88,7 +88,7 @@ namespace raisim {
             mano_->setGeneralizedCoordinate(Eigen::VectorXd::Zero(gcDim_));
 
             /// MUST BE DONE FOR ALL ENVIRONMENTS (CURRENTLY MANUALLY)
-            obDim_ =  282;
+            obDim_ =  279;
             obDouble_.setZero(obDim_);
 
             root_guided =  cfg["root_guided"].As<bool>();
@@ -562,7 +562,13 @@ namespace raisim {
             rewards_.record("body_qvel_reward_", std::max(0.0,body_qvel_reward_));
             rewards_.record("torque", std::max(0.0, mano_->getGeneralizedForce().squaredNorm()));
 
-            return (1-std::min(epoch_step/1000,1))*rewards_.sum();
+            live_reward=0;
+            if (time_step>60)
+            {
+            live_reward=1;
+            }
+
+            return (1-std::min(epoch_step/decay_epochs,1.0))*rewards_.sum()+live_reward;
         }
 
         /// This function computes and updates the observation/state space
@@ -783,15 +789,15 @@ namespace raisim {
 
             if (height_diff>0.03)
             {
-                terminalReward = -1 + (1-std::min(epoch_step/1000,1))*rewards_.sum() ;
+                terminalReward = -1 + (1-std::min(epoch_step/decay_epochs,1.0))*rewards_.sum();
                 return true;
             }
 
-            if (time_step==80)
-            {
-                terminalReward = 1 + (1-std::min(epoch_step/1000,1))*rewards_.sum() ;
-                return true;
-            }
+//            if (time_step==80)
+//            {
+//                terminalReward = 1 + (1-std::min(epoch_step/decay_epochs,1))*rewards_.sum() ;
+//                return true;
+//            }
 
 
             return false;
@@ -826,6 +832,8 @@ namespace raisim {
         double num_active_contacts_;
         double impulse_reward_ = 0.0;
         double obj_weight_;
+        double decay_epochs = 500;
+        double live_reward = 0;
         Eigen::VectorXd joint_limit_high, joint_limit_low, actionMean_, actionStd_, obDouble_, rel_pose_, finger_weights_, rel_obj_pos_, rel_objpalm_pos_, rel_body_pos_, rel_contact_pos_, rel_contacts_, contacts_, impulses_, rel_obj_pose_;
         Eigen::Vector3d bodyLinearVel_, bodyAngularVel_, rel_obj_qvel, rel_obj_vel, up_pose, rel_body_table_pos_;
         std::set<size_t> footIndices_;
