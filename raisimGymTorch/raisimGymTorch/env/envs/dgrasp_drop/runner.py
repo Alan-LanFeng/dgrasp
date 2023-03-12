@@ -159,7 +159,9 @@ for update in range(args.num_iterations):
         ppo.step(value_obs=obs, rews=reward, dones=dones)
         reward_ll_sum = reward_ll_sum + np.sum(reward)
     obs,_ = env.observe()
-
+    step_obs = np.zeros([num_envs, 1]).astype('float32')
+    step_obs[:] = (step+1) / n_steps
+    obs = np.concatenate([obs, step_obs], axis=1)
     ### Update policy
     success_rate = (num_envs - done_array.astype(bool).sum())/num_envs
 
