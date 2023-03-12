@@ -568,7 +568,8 @@ namespace raisim {
             live_reward=1;
             }
 
-            return (1-std::min(epoch_step/decay_epochs,1.0))*rewards_.sum()+live_reward;
+            //return (1-std::min(epoch_step/decay_epochs,1.0))*rewards_.sum()+live_reward;
+            return rewards_.sum()+live_reward;
         }
 
         /// This function computes and updates the observation/state space
@@ -789,7 +790,8 @@ namespace raisim {
 
             if (height_diff>0.03)
             {
-                terminalReward = -1 + (1-std::min(epoch_step/decay_epochs,1.0))*rewards_.sum();
+                //terminalReward = -1 + (1-std::min(epoch_step/decay_epochs,1.0))*rewards_.sum();
+                terminalReward = -1 + rewards_.sum();
                 return true;
             }
 

@@ -153,12 +153,14 @@ for update in range(args.num_iterations):
         obs = np.concatenate([obs,step_obs],axis=1)
         #obs = pe.add(obs,step)
         action = ppo.act(obs)
-        next_obs,reward, dones,_ = env.step(action.astype('float32'))
+        next_obs,reward, dones,info = env.step(action.astype('float32'))
+
         done_array+=dones
         reward.clip(min=reward_clip)
         ppo.step(value_obs=obs, rews=reward, dones=dones)
         reward_ll_sum = reward_ll_sum + np.sum(reward)
-    obs,_ = env.observe()
+    obs = next_obs
+
     step_obs = np.zeros([num_envs, 1]).astype('float32')
     step_obs[:] = (step+1) / n_steps
     obs = np.concatenate([obs, step_obs], axis=1)
