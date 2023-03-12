@@ -15,20 +15,20 @@ import argparse
 import joblib
 import math
 
-class PE():
-    """
-    Implement the PE function.
-    """
-    def __init__(self, d_model, max_len=5000):
-        # Compute the positional encodings once in log space.
-        pe = np.zeros([max_len, d_model])
-        position = np.arange(0, max_len)[:,np.newaxis].astype(np.float32)
-        div_term = np.exp(np.arange(0, d_model, 2).astype(np.float32) * -(math.log(10000.0) / d_model))
-        pe[:, 0::2] = np.sin(position * div_term)
-        pe[:, 1::2] = np.cos(position * div_term)[:,:-1]
-        self.pe = pe.astype(np.float32)
-    def add(self,obs,step):
-        return obs+ self.pe[[step]]
+# class PE():
+#     """
+#     Implement the PE function.
+#     """
+#     def __init__(self, d_model, max_len=5000):
+#         # Compute the positional encodings once in log space.
+#         pe = np.zeros([max_len, d_model])
+#         position = np.arange(0, max_len)[:,np.newaxis].astype(np.float32)
+#         div_term = np.exp(np.arange(0, d_model, 2).astype(np.float32) * -(math.log(10000.0) / d_model))
+#         pe[:, 0::2] = np.sin(position * div_term)
+#         pe[:, 1::2] = np.cos(position * div_term)[:,:-1]
+#         self.pe = pe.astype(np.float32)
+#     def add(self,obs,step):
+#         return obs+ self.pe[[step]]
 
 
 ### configuration of command line arguments
@@ -54,7 +54,7 @@ args = parser.parse_args()
 mode = args.mode
 weight_path = args.weight
 
-pe = PE(279,195)
+# pe = PE(279,195)
 
 print(f"Configuration file: \"{args.cfg}\"")
 print(f"Experiment name: \"{args.exp_name}\"")
@@ -175,7 +175,7 @@ env.load_object(obj_idx_stacked,obj_w_stacked, obj_dim_stacked, obj_type_stacked
 
 # Setting dimensions from environments
 n_act = final_qpos[0].shape[0]
-ob_dim = env.num_obs
+ob_dim = env.num_obs+1
 act_dim = env.num_acts
 
 ### Set training step parameters
@@ -305,8 +305,10 @@ else:
     for step in range(n_steps):
         obs = env.observe(False)
         obs = obs[:, :-4]
-
-        obs = pe.add(obs,step)
+        step_obs = np.zeros([num_envs,1]).astype('float32')
+        step_obs[:] = step/n_steps
+        obs = np.concatenate([obs,step_obs],axis=1)
+        #obs = pe.add(obs,step)
         action_ll = actor.architecture.architecture(torch.from_numpy(obs).to(device))
         frame_start = time.time()
 

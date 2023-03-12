@@ -101,7 +101,7 @@ obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], num_envs, 0)
 env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'],label=repeated_label,obj_pcd=obj_pcd)
 
 ### Setting dimensions from environments
-ob_dim = env.num_obs
+ob_dim = env.num_obs+1
 act_dim = env.num_acts
 
 ### Set training step parameters
@@ -117,7 +117,7 @@ ppo = get_ppo()
 
 avg_rewards = []
 eval_interval = 200
-pe = PE(ob_dim,n_steps)
+#pe = PE(ob_dim,n_steps)
 
 for update in range(args.num_iterations):
     start = time.time()
@@ -126,7 +126,7 @@ for update in range(args.num_iterations):
     average_dones = 0.
 
     ### Store policy
-    if update % cfg['environment']['eval_every_n'] == 0:
+    if update % cfg['environment']['eval_every_n'] == 0 and update:
         print("Visualizing and evaluating the current policy")
         torch.save({
             'actor_architecture_state_dict': ppo.actor.architecture.state_dict(),
@@ -148,7 +148,10 @@ for update in range(args.num_iterations):
     for step in range(n_steps):
 
         obs = next_obs
-        obs = pe.add(obs,step)
+        step_obs = np.zeros([num_envs,1]).astype('float32')
+        step_obs[:] = step/n_steps
+        obs = np.concatenate([obs,step_obs],axis=1)
+        #obs = pe.add(obs,step)
         action = ppo.act(obs)
         next_obs,reward, dones,_ = env.step(action.astype('float32'))
         done_array+=dones
