@@ -1,7 +1,11 @@
 seed: 1
 record_video: yes
 
+
 environment:
+  get_pcd: True
+  metainfo_dim: 0
+  extra_dim: 301
   render: True
   num_envs: 21
   num_repeats: 1

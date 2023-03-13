@@ -43,7 +43,7 @@ def setup_seed(seed):
 def get_obj_pcd(path):
     mesh = o3d.io.read_triangle_mesh(path, enable_post_processing=True)
     mesh.remove_duplicated_vertices()
-    obj_vertices = mesh.sample_points_uniformly(number_of_points=500)
+    obj_vertices = mesh.sample_points_uniformly(number_of_points=100)
     obj_vertices = np.asarray(obj_vertices.points)
 
     return obj_vertices
@@ -55,16 +55,51 @@ def first_nonzero(arr, axis, invalid_val=-1):
     return torch.where(mask.any(axis=axis), mask.argmax(axis=axis), invalid_val)
 
 def dgrasp_to_mano(param):
-    eulers = param[:,6:].reshape(-1, 3)
+    eulers = param[6:].reshape(-1, 3).copy()
+
+    # exchange ring finger and little finger's sequence
+    temp = eulers[6:9].copy()
+    eulers[6:9] = eulers[9:12]
+    eulers[9:12] = temp
+
+    # change euler angle to axis angle
     rotvec = R.from_euler('XYZ', eulers, degrees=False)
     rotvec = rotvec.as_rotvec().reshape(-1)
-
     global_orient = R.from_euler('XYZ', param[3:6], degrees=False)
     global_orient = global_orient.as_rotvec()
-    offset = np.array([0.09566993, 0.00638343, 0.00618631])
-    mano_param = np.concatenate([global_orient,rotvec,param[:3]-offset])
-    return mano_param
 
+    # translation minus a offset
+    offset = np.array([0.09566993, 0.00638343, 0.00618631])
+    mano_param = np.concatenate([global_orient, rotvec, param[:3] - offset])
+
+    mano_param = mano_param[np.newaxis]
+    mano_layer = ManoLayer(mano_root='/local/home/lafeng/Desktop/dgrasp/manopth/mano/models',use_pca=False)
+    verts,joints = mano_layer(th_pose_coeffs=torch.tensor(mano_param[:,:48],dtype=torch.float32),th_trans = torch.tensor(mano_param[:,48:],dtype=torch.float32))
+    verts = verts[0]/1000
+    joints = joints[0]/1000
+
+    return verts,joints
+
+def show_pointcloud_objhand(hand, obj):
+    '''
+    Draw hand and obj xyz at the same time
+    :param hand: [778, 3]
+    :param obj: [3000, 3]
+    '''
+
+
+    hand_dim = hand.shape[0]
+    obj_dim = obj.shape[0]
+    handObj = np.vstack((hand, obj))
+    c_hand, c_obj = np.array([[1, 0, 0]]), np.array([[0, 0, 1]]) # RGB
+    c_hand = np.repeat(c_hand, repeats=hand_dim, axis=0) # [778,3]
+    c_obj = np.repeat(c_obj, repeats=obj_dim, axis=0) # [3000,3]
+    c_hanObj = np.vstack((c_hand, c_obj)) # [778+3000, 3]
+
+    pc = o3d.geometry.PointCloud()
+    pc.points = o3d.utility.Vector3dVector(handObj)
+    pc.colors = o3d.utility.Vector3dVector(c_hanObj)
+    o3d.visualization.draw_geometries([pc])
 
 def get_args():
 
@@ -80,12 +115,14 @@ def get_args():
     parser.add_argument('-t', '--test', action="store_true")
     parser.add_argument('-mc', '--mesh_collision', action="store_true")
     parser.add_argument('-ao', '--all_objects', action="store_true")
-    parser.add_argument('-ev', '--evaluate', action="store_true")
     parser.add_argument('-to', '--test_object_set', type=int, default=-1)
     parser.add_argument('-ac', '--all_contact', action="store_true")
     parser.add_argument('-seed', '--seed', type=int, default=1)
     parser.add_argument('-itr', '--num_iterations', type=int, default=3001)
     parser.add_argument('-nr', '--num_repeats', type=int, default=10)
+    parser.add_argument('-ev', '--vis_evaluate', action="store_true")
+    parser.add_argument('-sv', '--store_video', action="store_true")
+
     args = parser.parse_args()
 
     return args

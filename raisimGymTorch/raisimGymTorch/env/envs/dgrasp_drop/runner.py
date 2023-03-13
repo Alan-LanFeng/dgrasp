@@ -16,28 +16,32 @@ import math
 
 import joblib
 
-class PE():
-    """
-    Implement the PE function.
-    """
-    def __init__(self, d_model, max_len=5000):
-        # Compute the positional encodings once in log space.
-        pe = np.zeros([max_len, d_model])
-        position = np.arange(0, max_len)[:,np.newaxis].astype(np.float32)
-        div_term = np.exp(np.arange(0, d_model, 2).astype(np.float32) * -(math.log(10000.0) / d_model))
-        pe[:, 0::2] = np.sin(position * div_term)
-        pe[:, 1::2] = np.cos(position * div_term)[:,:-1]
-        self.pe = pe.astype(np.float32)
-    def add(self,obs,step):
-        return obs+ self.pe[[step]]
-
-
 def get_ppo():
     actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['policy_net'], nn.LeakyReLU, ob_dim, act_dim),
                              ppo_module.MultivariateGaussianDiagonalCovariance(act_dim, num_envs, 1.0,
                                                                                NormalSampler(act_dim)), device)
 
     critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['value_net'], nn.LeakyReLU, ob_dim, 1), device)
+
+    ppo = PPO.PPO(actor=actor,
+                  critic=critic,
+                  num_envs=num_envs,
+                  num_transitions_per_env=n_steps,
+                  num_learning_epochs=4,
+                  gamma=0.996,
+                  lam=0.95,
+                  num_mini_batches=4,
+                  device=device,
+                  log_dir=saver.data_dir,
+                  shuffle_batch=False
+                  )
+    return ppo
+def get_ppo():
+    actor = ppo_module.Actor(ppo_module.pn_pcd(ob_dim, act_dim),
+                             ppo_module.MultivariateGaussianDiagonalCovariance(act_dim, num_envs, 1.0,
+                                                                               NormalSampler(act_dim)), device)
+
+    critic = ppo_module.Critic(ppo_module.pn_pcd(ob_dim, 1), device)
 
     ppo = PPO.PPO(actor=actor,
                   critic=critic,
@@ -60,7 +64,6 @@ args = get_args()
 setup_seed(args.seed)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 task_path = os.path.dirname(os.path.realpath(__file__))
 home_path = task_path + "/../../../../.."
 exp_path = home_path
@@ -73,21 +76,15 @@ print(f"Experiment name: \"{args.exp_name}\"")
 cfg = YAML().load(open(task_path+'/cfgs/' + args.cfg, 'r'))
 wandb.init(project='dgrasp',config=cfg)
 
-### set seed
-if args.seed != 1:
-    cfg['seed']=args.seed
+cfg['seed']=args.seed
 
 ### get experiment parameters
 num_envs = cfg['environment']['num_envs']
 pre_grasp_steps = cfg['environment']['pre_grasp_steps']
 trail_steps = cfg['environment']['trail_steps']
 reward_clip = cfg['environment']['reward_clip']
-
-
 dict_labels=joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
 repeated_label = repeat_label(dict_labels[args.obj_id],args.num_repeats)
-
-
 num_envs = repeated_label['final_qpos'].shape[0]
 cfg['environment']['num_envs'] = num_envs
 cfg["testing"] = True if args.test else False
@@ -101,7 +98,7 @@ obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], num_envs, 0)
 env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'],label=repeated_label,obj_pcd=obj_pcd)
 
 ### Setting dimensions from environments
-ob_dim = env.num_obs+1
+ob_dim = env.obsdim_for_agent
 act_dim = env.num_acts
 
 ### Set training step parameters
@@ -116,8 +113,6 @@ saver = ConfigurationSaver(log_dir = exp_path + "/raisimGymTorch/" + args.stored
 ppo = get_ppo()
 
 avg_rewards = []
-eval_interval = 200
-#pe = PE(ob_dim,n_steps)
 
 for update in range(args.num_iterations):
     start = time.time()
@@ -126,7 +121,7 @@ for update in range(args.num_iterations):
     average_dones = 0.
 
     ### Store policy
-    if update % cfg['environment']['eval_every_n'] == 0 and update:
+    if update % cfg['environment']['eval_every_n'] == 0:
         print("Visualizing and evaluating the current policy")
         torch.save({
             'actor_architecture_state_dict': ppo.actor.architecture.state_dict(),
@@ -148,9 +143,6 @@ for update in range(args.num_iterations):
     for step in range(n_steps):
 
         obs = next_obs
-        step_obs = np.zeros([num_envs,1]).astype('float32')
-        step_obs[:] = step/n_steps
-        obs = np.concatenate([obs,step_obs],axis=1)
         #obs = pe.add(obs,step)
         action = ppo.act(obs)
         next_obs,reward, dones,info = env.step(action.astype('float32'))
@@ -159,11 +151,8 @@ for update in range(args.num_iterations):
         reward.clip(min=reward_clip)
         ppo.step(value_obs=obs, rews=reward, dones=dones)
         reward_ll_sum = reward_ll_sum + np.sum(reward)
-    obs = next_obs
 
-    step_obs = np.zeros([num_envs, 1]).astype('float32')
-    step_obs[:] = (step+1) / n_steps
-    obs = np.concatenate([obs, step_obs], axis=1)
+    obs = next_obs
     ### Update policy
     success_rate = (num_envs - done_array.astype(bool).sum())/num_envs
 

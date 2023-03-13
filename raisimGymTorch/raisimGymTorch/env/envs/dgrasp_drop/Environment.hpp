@@ -424,10 +424,10 @@ namespace raisim {
             raisim::Vec<3> obj_pos_raisim, euler_goal_world, final_obj_pose_mat, hand_pos_world, hand_pose, act_pos, act_or_pose;
             raisim::transpose(Obj_orientation_temp,Obj_orientation);
             obj_pos_raisim[0] = final_obj_pos_[0]-Obj_Position[0]; obj_pos_raisim[1] = final_obj_pos_[1]-Obj_Position[1]; obj_pos_raisim[2] = final_obj_pos_[2]-Obj_Position[2];
-            if (time_step>60)
-            {
-                box->setPosition(1.25,0,0.0);
-            }
+//            if (time_step>60)
+//            {
+//                box->setPosition(1.25,0,0.0);
+//            }
             if (motion_synthesis)
             {
                 raisim::quatToRotMat(final_obj_pos_.tail(4),rotmat_final_obj_pos);
@@ -563,10 +563,10 @@ namespace raisim {
             rewards_.record("torque", std::max(0.0, mano_->getGeneralizedForce().squaredNorm()));
 
             live_reward=0;
-            if (time_step>60)
-            {
-            live_reward=1;
-            }
+//            if (time_step>60)
+//            {
+//            live_reward=1;
+//            }
 
             //return (1-std::min(epoch_step/decay_epochs,1.0))*rewards_.sum()+live_reward;
             return rewards_.sum()+live_reward;
@@ -717,22 +717,26 @@ namespace raisim {
 //            box->getPosition(0,table_pos);
             /// add all features to observation
             obDouble_ <<
+            // hand info
                     gc_,
                     bodyLinearVel_,
                     bodyAngularVel_,
                     gv_.tail(gvDim_ - 6),
+                    impulses_,
+                    rel_body_table_pos_,
+
+            // label info
                     rel_body_pos_,
                     rel_pose_,
-                    rel_objpalm_pos_,
-                    rel_obj_vel,
-                    rel_obj_qvel,
                     final_contact_array_,
-                    impulses_,
                     rel_contacts_,
+            // obj info
+                    rel_objpalm_pos_,
+                    obj_pose_.e(),
                     rel_obj_pos_,
-                    rel_body_table_pos_,
-                    obj_pose_.e();
-                    //table_pos.e();
+                    rel_obj_vel,
+                    rel_obj_qvel;
+
         }
 
         /// Set observation in wrapper to current observation
@@ -784,16 +788,16 @@ namespace raisim {
 
                 return true;
             }
-            Obj_Position = obj_mesh_1->getPosition();
-
-            height_diff = obj_pos_init_[2]-Obj_Position[2];
-
-            if (height_diff>0.03)
-            {
-                //terminalReward = -1 + (1-std::min(epoch_step/decay_epochs,1.0))*rewards_.sum();
-                terminalReward = -1 + rewards_.sum();
-                return true;
-            }
+//            Obj_Position = obj_mesh_1->getPosition();
+//
+//            height_diff = obj_pos_init_[2]-Obj_Position[2];
+//
+//            if (height_diff>0.03)
+//            {
+//                //terminalReward = -1 + (1-std::min(epoch_step/decay_epochs,1.0))*rewards_.sum();
+//                terminalReward = -1 + rewards_.sum();
+//                return true;
+//            }
 
 //            if (time_step==80)
 //            {

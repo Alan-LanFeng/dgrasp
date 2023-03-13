@@ -728,21 +728,27 @@ namespace raisim {
                 obj_table_contact = 1;
 
             /// add all features to observation
-            obDouble_ << gc_,
+            obDouble_ <<
+            // hand info
+                    gc_,
                     bodyLinearVel_,
                     bodyAngularVel_,
                     gv_.tail(gvDim_ - 6),
+                    impulses_,
+                    rel_body_table_pos_,
+
+            // label info
                     rel_body_pos_,
                     rel_pose_,
+                    final_contact_array_,
+                    rel_contacts_,
+            // obj info
                     rel_objpalm_pos_,
+                    obj_pose_.e(),
+                    rel_obj_pos_,
                     rel_obj_vel,
                     rel_obj_qvel,
-                    final_contact_array_,
-                    impulses_,
-                    rel_contacts_,
-                    rel_obj_pos_,
-                    rel_body_table_pos_,
-                    obj_pose_.e(),
+
                     Obj_Position.e(),
                     obj_table_contact;
         }

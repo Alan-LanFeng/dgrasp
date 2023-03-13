@@ -63,7 +63,10 @@ class RolloutStorage:
 
     def compute_returns(self, last_values, critic, gamma, lam):
         with torch.no_grad():
-            self.values = critic.predict(torch.from_numpy(self.critic_obs).to(self.device)).cpu().numpy()
+            t,a,dim = self.critic_obs.shape
+            for i in range(t):
+                self.values[i] = critic.predict(torch.from_numpy(self.critic_obs[i]).to(self.device)).cpu().numpy()
+            #self.values = critic.predict(torch.from_numpy(self.critic_obs).to(self.device)).cpu().numpy()
 
         last_values = last_values.cpu().numpy()
         self.rewards[-1] += gamma * last_values*(1.0 - self.dones[-1])
@@ -72,7 +75,8 @@ class RolloutStorage:
         size = self.actions.shape[0]
         for step in reversed(range(size)):
             if step == size - 1:
-                next_non_terminal = 1.0 - self.dones[step]
+                #next_non_terminal = 1.0 - self.dones[step]
+                next_non_terminal = 0
                 next_values = last_values
             else:
                 next_non_terminal = 1.0 - self.episode_starts[step+1]

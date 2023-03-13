@@ -7,32 +7,51 @@ import platform
 import os
 import copy
 from scipy.spatial.transform import Rotation as R
+#from raisimGymTorch.helper.utils import dgrasp_to_mano,show_pointcloud_objhand
 
 class RaisimGymVecEnv:
 
-    def __init__(self, impl, cfg, normalize_ob=False, seed=0, normalize_rew=True, clip_obs=10.,label=None, obj_pcd=None):
+    def __init__(self, impl, cfg, normalize_ob=False,
+                 seed=0, normalize_rew=True, clip_obs=10., label=None,
+                 obj_pcd=None):
         if platform.system() == "Darwin":
-            os.environ['KMP_DUPLICATE_LIB_OK']='True'
+            os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
         self.normalize_ob = normalize_ob
         self.normalize_rew = normalize_rew
         self.clip_obs = clip_obs
         self.wrapper = impl
-        self.num_obs = self.wrapper.getObDim()
+        self.obsdim_for_agent = self.wrapper.getObDim()+cfg['extra_dim']-cfg['metainfo_dim']
+        self.meta_dim = cfg['metainfo_dim']
         self.num_acts = self.wrapper.getActionDim()
-        self._observation = np.zeros([self.num_envs, self.num_obs], dtype=np.float32)
-        self.obs_rms = RunningMeanStd(shape=[self.num_envs, self.num_obs])
+        self._observation = np.zeros([self.num_envs, self.wrapper.getObDim()], dtype=np.float32)
+        self.obs_rms = RunningMeanStd(shape=[self.num_envs, self.obsdim_for_agent])
         self._reward = np.zeros(self.num_envs, dtype=np.float32)
         self._done = np.zeros(self.num_envs, dtype=bool)
         self.rewards = [[] for _ in range(self.num_envs)]
         self.label = label
-        #if obj_pcd:
+        self.time_step = 0
+        self.n_steps =  cfg['pre_grasp_steps']+ cfg['trail_steps']
+        # if obj_pcd:
         self.obj_pcd = obj_pcd
-        self.load_object(label['obj_idx_stacked'], label['obj_w_stacked'], label['obj_dim_stacked'], label['obj_type_stacked'])
-        self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'], label['final_contacts'])
+        self.load_object(label['obj_idx_stacked'], label['obj_w_stacked'], label['obj_dim_stacked'],
+                         label['obj_type_stacked'])
+        self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
+                       label['final_contacts'])
+        self.get_pcd = cfg['get_pcd']
 
     def load_object(self, obj_idx, obj_weight, obj_dim, obj_type):
         self.wrapper.load_object(obj_idx, obj_weight, obj_dim, obj_type)
+
+    def move_to_first(self,i):
+
+        for k,v in self.label.items():
+            label_to_move = v[i].copy()
+            self.label[k][0] = label_to_move
+        label = self.label
+
+        self.wrapper.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
+                       label['final_contacts'])
 
     def set_goals(self, obj_pos, ee_pos, pose, contact_pos, normals):
         self.wrapper.set_goals(obj_pos, ee_pos, pose, contact_pos, normals)
@@ -53,8 +72,9 @@ class RaisimGymVecEnv:
         self.wrapper.stopRecordingVideo()
 
     def step(self, action):
+        self.time_step+=1
         self.wrapper.step(action, self._reward, self._done)
-        obs,info = self.observe()
+        obs, info = self.observe()
         return obs, self._reward.copy(), self._done.copy(), info
 
     def load_scaling(self, dir_name, iteration, count=1e5):
@@ -70,60 +90,85 @@ class RaisimGymVecEnv:
         np.savetxt(mean_file_name, self.obs_rms.mean)
         np.savetxt(var_file_name, self.obs_rms.var)
 
-    def observe(self, update_mean=True,get_obj_pcd=False):
+    def observe(self, update_mean=True):
+        #ret_obs = {}
         self.wrapper.observe(self._observation)
-        obs = self._observation.copy()
-        if get_obj_pcd:
+        ob_dim = self._observation.shape[-1]
+        meta_info = self._observation[:,ob_dim-self.meta_dim:].copy()
+        obs = self._observation[:,:ob_dim-self.meta_dim].copy()
 
+        # ret_obs['hand_obs'] = obs[:,:121]
+        # ret_obs['label_obs'] = obs[:,121:264]
+        # ret_obs['obj_info'] = obs[:,264:]
+
+        step_obs = np.zeros([self._observation.shape[0],1]).astype('float32')
+        step_obs[:] = self.time_step/self.n_steps
+        obs = np.concatenate([obs,step_obs],axis=1)
+
+
+        if self.get_pcd:
             obj_pcd = self.obj_pcd
-            env_num,pcd_num,dim = obj_pcd.shape
+            env_num, pcd_num, dim = obj_pcd.shape
 
-            obj_pos = copy.copy(self._observation[:,213:216])
-            obj_euler = copy.copy(self._observation[:,-3:])
-            #gc = copy.copy(self._observation[:,:51])
+            obj_pos = copy.copy(self._observation[:, -15:-12])
+            obj_euler = copy.copy(self._observation[:, -12:-9])
+            hand_pos = copy.copy(self._observation[:, :3])
+            hand_rot = copy.copy(self._observation[:, 3:6])
 
-            r_obj = obj_euler[:,np.newaxis].repeat(pcd_num,1).reshape(-1,dim)
-            obj_pos = obj_pos[:,np.newaxis].repeat(pcd_num,1).reshape(-1,dim)
-            r_obj = R.from_euler('XYZ',r_obj,degrees=False)
+            r_obj = obj_euler[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
+            obj_pos = obj_pos[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
+            r_obj = R.from_euler('XYZ', r_obj, degrees=False)
 
-            obj_pcd = r_obj.apply(obj_pcd.reshape(-1,dim))-obj_pos
-            obj_pcd = obj_pcd.reshape(env_num,-1)
-            obs = np.concatenate([obs,obj_pcd],dim=-1)
-            #hand_pcd = get_hand_mesh(gc,from_gc=True)
+            obj_pcd = r_obj.apply(obj_pcd.reshape(-1, dim)) - obj_pos
+            #obj_pcd = obj_pcd.reshape(env_num, -1).astype('float32')
 
-        # tablepos = obs[:,-3:]
-        # obs = obs[:,:-3]
-        # info = {}
-        # info['table_pos'] = tablepos
+            r_hand = hand_rot[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
+            hand_pos = hand_pos[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
+            r_hand = R.from_euler('XYZ', r_hand, degrees=False)
+
+            obj_pcd = r_hand.apply(obj_pcd.reshape(-1, dim)) + hand_pos
+            obj_pcd = obj_pcd.reshape(env_num, -1).astype('float32')
+
+            obs = np.concatenate([obs, obj_pcd], axis=-1)
+
+            #
+            # if self.time_step%50==0:
+            #     idx =11
+            #     gc = copy.copy(self._observation[idx,:51])
+            #     verts,joints = dgrasp_to_mano(gc)
+            #     show_pointcloud_objhand(verts,obj_pcd[idx].reshape(-1,3))
+
+
         info = {}
+        info['meta_info'] = meta_info
         if self.normalize_ob:
             if update_mean:
                 self.obs_rms.update(self._observation)
 
             return self._normalize_observation(self._observation)
         else:
-            return obs.astype('float32'), info
+            return obs, info
 
     def set_root_control(self):
         self.wrapper.set_root_control()
 
-    def reset(self,seed=None,option=None):
-        ### Add some noise to initial hand position
-        #super().reset(seed=seed)
-
+    def reset(self, add_noise=True):
+        self.time_step = 0
         qpos_reset = self.label['qpos_reset'].copy()
         obj_pose_reset = self.label['obj_pose_reset'].copy()
         num_envs = qpos_reset.shape[0]
-        random_noise_pos = np.random.uniform([-0.02, -0.02, 0.01], [0.02, 0.02, 0.01], (num_envs, 3)).copy()
-        random_noise_qpos = np.random.uniform(-0.05, 0.05, (num_envs, 48)).copy()
-        qpos_noisy_reset = qpos_reset
-        qpos_noisy_reset[:, :3] += random_noise_pos[:, :3]
-        qpos_noisy_reset[:, 3:] += random_noise_qpos[:, :]
+        if add_noise:
+            random_noise_pos = np.random.uniform([-0.02, -0.02, 0.01], [0.02, 0.02, 0.01], (num_envs, 3)).copy()
+            random_noise_qpos = np.random.uniform(-0.05, 0.05, (num_envs, 48)).copy()
+            qpos_noisy_reset = qpos_reset
+            qpos_noisy_reset[:, :3] += random_noise_pos[:, :3]
+            qpos_noisy_reset[:, 3:] += random_noise_qpos[:, :]
+            ### Run episode rollouts
+            self.reset_state(qpos_noisy_reset, np.zeros((num_envs, 51), 'float32'), obj_pose_reset)
+        else:
+            self.reset_state(qpos_reset, np.zeros((num_envs, 51), 'float32'), obj_pose_reset)
 
-        ### Run episode rollouts
-        self.reset_state(qpos_noisy_reset, np.zeros((num_envs, 51), 'float32'), obj_pose_reset)
-
-        obs,info = self.observe()
+        obs, info = self.observe()
         return obs, info
 
     def load_object(self, obj_idx, obj_weight, obj_dim, obj_type):
@@ -189,4 +234,3 @@ class RunningMeanStd(object):
         self.mean = new_mean
         self.var = new_var
         self.count = new_count
-
