@@ -1,6 +1,6 @@
 from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin import dgrasp_test as mano
-from raisimGymTorch.env.RaisimGymVecEnv_original import RaisimGymVecEnv as VecEnv
+from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.env.bin.dgrasp_test import NormalSampler
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
 import os
@@ -13,75 +13,68 @@ import torch
 import datetime
 import argparse
 import joblib
-import math
+from raisimGymTorch.helper.utils import get_obj_pcd,get_args,repeat_label,setup_seed
 
-# class PE():
-#     """
-#     Implement the PE function.
-#     """
-#     def __init__(self, d_model, max_len=5000):
-#         # Compute the positional encodings once in log space.
-#         pe = np.zeros([max_len, d_model])
-#         position = np.arange(0, max_len)[:,np.newaxis].astype(np.float32)
-#         div_term = np.exp(np.arange(0, d_model, 2).astype(np.float32) * -(math.log(10000.0) / d_model))
-#         pe[:, 0::2] = np.sin(position * div_term)
-#         pe[:, 1::2] = np.cos(position * div_term)[:,:-1]
-#         self.pe = pe.astype(np.float32)
-#     def add(self,obs,step):
-#         return obs+ self.pe[[step]]
+def get_ppo():
+    actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['policy_net'], nn.LeakyReLU, ob_dim, act_dim),
+                             ppo_module.MultivariateGaussianDiagonalCovariance(act_dim, num_envs, 1.0,
+                                                                               NormalSampler(act_dim)), device)
 
+    critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['value_net'], nn.LeakyReLU, ob_dim, 1), device)
 
-### configuration of command line arguments
-parser = argparse.ArgumentParser()
-parser.add_argument('-c', '--cfg', help='config file', type=str, default='cfg.yaml')
-parser.add_argument('-m', '--mode', help='set mode either train or test', type=str, default='train')
-parser.add_argument('-d', '--logdir', help='set dir for storing data', type=str, default=None)
-parser.add_argument('-e', '--exp_name', help='exp_name', type=str, default="grasping")
-parser.add_argument('-w', '--weight', type=str, default='2021-09-29-18-20-07/full_400.pt')
-parser.add_argument('-sd', '--storedir', type=str, default='data_all')
-parser.add_argument('-o', '--obj_id',type=int, default=1)
-parser.add_argument('-t','--test', action="store_true")
-parser.add_argument('-mc','--mesh_collision', action="store_true")
-parser.add_argument('-ao','--all_objects', action="store_true")
-parser.add_argument('-ev','--vis_evaluate', action="store_true")
-parser.add_argument('-sv','--store_video', action="store_true")
-parser.add_argument('-to','--test_object_set', type=int, default=-1)
-parser.add_argument('-ac','--all_contact', action="store_true")
-parser.add_argument('-seed','--seed', type=int, default=1)
-parser.add_argument('-itr','--num_iterations', type=int, default=3001)
-parser.add_argument('-nr','--num_repeats', type=int, default=1)
-args = parser.parse_args()
-mode = args.mode
-weight_path = args.weight
+    ppo = PPO.PPO(actor=actor,
+                  critic=critic,
+                  num_envs=num_envs,
+                  num_transitions_per_env=n_steps,
+                  num_learning_epochs=4,
+                  gamma=0.996,
+                  lam=0.95,
+                  num_mini_batches=4,
+                  device=device,
+                  log_dir=saver.data_dir,
+                  shuffle_batch=False
+                  )
+    return ppo
 
-# pe = PE(279,195)
+def get_ppo():
+    actor = ppo_module.Actor(ppo_module.MLP_pcd(ob_dim, act_dim),
+                             ppo_module.MultivariateGaussianDiagonalCovariance(act_dim, num_envs, 1.0,
+                                                                               NormalSampler(act_dim)), device)
+
+    critic = ppo_module.Critic(ppo_module.MLP_pcd(ob_dim, 1), device)
+
+    ppo = PPO.PPO(actor=actor,
+                  critic=critic,
+                  num_envs=num_envs,
+                  num_transitions_per_env=n_steps,
+                  num_learning_epochs=4,
+                  gamma=0.996,
+                  lam=0.95,
+                  num_mini_batches=4,
+                  device=device,
+                  log_dir=saver.data_dir,
+                  shuffle_batch=False
+                  )
+    return ppo
+
+args = get_args()
+setup_seed(args.seed)
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+task_path = os.path.dirname(os.path.realpath(__file__))
+home_path = task_path + "/../../../../.."
+exp_path = home_path
 
 print(f"Configuration file: \"{args.cfg}\"")
 print(f"Experiment name: \"{args.exp_name}\"")
 
-### task specification
-task_name = args.exp_name
-### check if gpu is available
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-### directories
-task_path = os.path.dirname(os.path.realpath(__file__))
-home_path = task_path + "/../../../../.."
-
-if args.logdir is None:
-    exp_path = home_path
-else:
-    exp_path = args.logdir
-
 ### load config
 cfg = YAML().load(open(task_path+'/cfgs/' + args.cfg, 'r'))
 
-### set seed
-if args.seed != 1:
-    cfg['seed']=args.seed
+cfg['seed']=args.seed
 
 ### get experiment parameters
-num_envs = cfg['environment']['num_envs']
+
 pre_grasp_steps = cfg['environment']['pre_grasp_steps']
 trail_steps = cfg['environment']['trail_steps']
 test_inference = args.test
@@ -94,184 +87,61 @@ num_repeats= args.num_repeats
 activations = nn.LeakyReLU
 output_activation = nn.Tanh
 
-### Load data labels
-if not args.test:
-    dict_labels=joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
-    #dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
-    # qpos_reset = dict_labels['qpos_reset'][:,:3]
-    # obj_reset = dict_labels['obj_pose_reset'][:,:3]
-    # vec = qpos_reset-obj_reset
-    # new_pos = vec+obj_reset
-    # dict_labels['qpos_reset'][:, :3] = new_pos
-    # dict_labels['qpos_reset'][:, 3:6] = dict_labels['final_qpos'][:,3:6]
-    # dict_labels['qpos_reset'] = dict_labels['final_qpos']
-    # dict_labels['obj_pose_reset'] = dict_labels['final_obj_pos']
-    #dict_labels[7] = dict_labels
-else:
-    dict_labels=joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
-
-### Load data labels for all objects
-if all_obj_train:
-    obj_w_list, obj_pose_reset_list, qpos_reset_list, obj_dim_list, obj_type_list, obj_idx_list_list = [], [], [], [], [], []
-    final_qpos_list, final_obj_pos_list, final_pose_list,final_ee_list, final_ee_rel_list, final_contact_pos_list, final_contacts_list = [], [], [], [], [], [], []
-    ### Iterate through all objects and add to single dict
-    for obj_key in dict_labels.keys():
-        final_qpos_list.append(dict_labels[obj_key]['final_qpos'])
-        final_obj_pos_list.append(dict_labels[obj_key]['final_obj_pos'])
-        final_pose_list.append(dict_labels[obj_key]['final_pose'])
-        final_ee_list.append(dict_labels[obj_key]['final_ee'])
-        final_ee_rel_list.append(dict_labels[obj_key]['final_ee_rel'])
-        final_contact_pos_list.append(dict_labels[obj_key]['final_contact_pos'])
-        final_contacts_list.append(dict_labels[obj_key]['final_contacts'])
-
-        obj_w_list.append(dict_labels[obj_key]['obj_w_stacked'])
-        obj_dim_list.append(dict_labels[obj_key]['obj_dim_stacked'])
-        obj_type_list.append(dict_labels[obj_key]['obj_type_stacked'])
-        obj_idx_list_list.append(dict_labels[obj_key]['obj_idx_stacked'])
-        obj_pose_reset_list.append(dict_labels[obj_key]['obj_pose_reset'])
-        qpos_reset_list.append(dict_labels[obj_key]['qpos_reset'])
-
-    final_qpos = np.repeat(np.vstack(final_qpos_list),num_repeats,0).astype('float32')
-    final_obj_pos = np.repeat(np.vstack(final_obj_pos_list),num_repeats,0).astype('float32')
-    final_pose = np.repeat(np.vstack(final_pose_list),num_repeats,0).astype('float32')
-    final_ee = np.repeat(np.vstack(final_ee_list),num_repeats,0).astype('float32')
-    final_ee_rel =  np.repeat(np.vstack(final_ee_rel_list),num_repeats,0).astype('float32')
-    final_contact_pos = np.repeat(np.vstack(final_contact_pos_list),num_repeats,0).astype('float32')
-    final_contacts = np.repeat(np.vstack(final_contacts_list),num_repeats,0).astype('float32')
-
-    obj_w_stacked = np.repeat(np.hstack(obj_w_list),num_repeats,0).astype('float32')
-    obj_dim_stacked = np.repeat(np.vstack(obj_dim_list),num_repeats,0).astype('float32')
-    obj_type_stacked = np.repeat(np.hstack(obj_type_list),num_repeats,0)
-    obj_idx_stacked = np.repeat(np.hstack(obj_idx_list_list),num_repeats,0)
-    obj_pose_reset = np.repeat(np.vstack(obj_pose_reset_list),num_repeats,0).astype('float32')
-    qpos_reset = np.repeat(np.vstack(qpos_reset_list),num_repeats,0).astype('float32')
-
-### Load labels for single object
-else:
-    final_qpos = np.repeat(dict_labels[train_obj_id]['final_qpos'],num_repeats,0).astype('float32')
-    final_obj_pos = np.repeat(dict_labels[train_obj_id]['final_obj_pos'],num_repeats,0).astype('float32')
-    final_pose = np.repeat(dict_labels[train_obj_id]['final_pose'],num_repeats,0).astype('float32')
-    final_ee = np.repeat(dict_labels[train_obj_id]['final_ee'],num_repeats,0).astype('float32')
-    final_ee_rel = np.repeat(dict_labels[train_obj_id]['final_ee_rel'],num_repeats,0).astype('float32')
-    final_contact_pos = np.repeat(dict_labels[train_obj_id]['final_contact_pos'],num_repeats,0).astype('float32')
-    final_contacts = np.repeat(dict_labels[train_obj_id]['final_contacts'],num_repeats,0).astype('float32')
-
-    obj_w_stacked = np.repeat(dict_labels[train_obj_id]['obj_w_stacked'],num_repeats,0).astype('float32')
-    obj_dim_stacked = np.repeat(dict_labels[train_obj_id]['obj_dim_stacked'],num_repeats,0).astype('float32')
-    obj_type_stacked = np.repeat(dict_labels[train_obj_id]['obj_type_stacked'],num_repeats,0)
-    obj_idx_stacked = np.repeat(dict_labels[train_obj_id]['obj_idx_stacked'],num_repeats,0)
-    obj_pose_reset = np.repeat(dict_labels[train_obj_id]['obj_pose_reset'],num_repeats,0).astype('float32')
-    qpos_reset = np.repeat(dict_labels[train_obj_id]['qpos_reset'],num_repeats,0).astype('float32')
 
 
-num_envs = 1 if args.vis_evaluate else final_qpos.shape[0]
-cfg['environment']['hand_model'] = "mano_mean_meshcoll.urdf" if args.mesh_collision else "mano_mean.urdf"
+dict_labels=joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
+repeated_label = repeat_label(dict_labels[args.obj_id],1)
+
+num_envs = repeated_label['final_qpos'].shape[0]
+mesh_path = "../rsc/meshes_simplified/008_pudding_box/mesh_aligned.obj"
+obj_pcd = get_obj_pcd(mesh_path)
+obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], num_envs, 0)
+
 cfg['environment']['num_envs'] = 1 if args.vis_evaluate else num_envs
 cfg["testing"] = True if test_inference else False
-print('num envs', final_qpos.shape[0])
 
-env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
-env.load_object(obj_idx_stacked,obj_w_stacked, obj_dim_stacked, obj_type_stacked)
 
-# Setting dimensions from environments
-n_act = final_qpos[0].shape[0]
-ob_dim = env.num_obs+1
+env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'],label=repeated_label,obj_pcd=obj_pcd)
+ob_dim = env.obsdim_for_agent
 act_dim = env.num_acts
 
 ### Set training step parameters
 grasp_steps = pre_grasp_steps
 n_steps = grasp_steps  + trail_steps
-total_steps = n_steps * env.num_envs
 
 avg_rewards = []
 
 ### Set up logging
-log_dir = exp_path + "/raisimGymTorch/" + args.storedir + "/" + task_name
+log_dir = exp_path + "/raisimGymTorch/" + args.storedir + "/" + args.exp_name
 saver = ConfigurationSaver(log_dir = log_dir,
                            save_items=[task_path + "/cfgs/" + args.cfg, task_path + "/Environment.hpp", task_path + "/runner.py"], test_dir=True)
 
-### Set up RL algorithm
-actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['policy_net'], activations, ob_dim-meta_info_dim, act_dim),
-                         ppo_module.MultivariateGaussianDiagonalCovariance(act_dim, num_envs, 1.0,  NormalSampler(act_dim)),device)
-
-critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['value_net'], activations, ob_dim-meta_info_dim, 1),device)
-
-ppo = PPO.PPO(actor=actor,
-              critic=critic,
-              num_envs=num_envs,
-              num_transitions_per_env=n_steps,
-              num_learning_epochs=4,
-              gamma=0.996,
-              lam=0.95,
-              num_mini_batches=4,
-              device=device,
-              log_dir=saver.data_dir,
-              shuffle_batch=False
-              )
+ppo = get_ppo()
 
 ### Loading a pretrained model
-load_param(saver.data_dir.split('eval')[0]+weight_path, env, actor, critic, ppo.optimizer, saver.data_dir,args.cfg, store_again=False)
-
-### Initialize the environment
-env.set_goals(final_obj_pos,final_ee,final_pose,final_contact_pos,final_contacts)
-env.reset_state(qpos_reset, np.zeros((num_envs,51),'float32'), obj_pose_reset)
+load_param(saver.data_dir.split('eval')[0]+args.weight, env, ppo.actor, ppo.critic, ppo.optimizer, saver.data_dir,args.cfg, store_again=False)
 
 
 ### Evaluate trained model visually (note always the first environment gets visualized)
 if args.vis_evaluate:
     ### Start recording
 
-    for i in range(final_qpos.shape[0]):
+    for i in range(num_envs):
         if args.store_video:
             env.turn_on_visualization()
             env.start_video_recording(
                 datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_" + str(i) + '.mp4')
         ### Set labels and load objects for current label (only one visualization per rollout possible)
-        qpos_reset_seq = qpos_reset.copy()
-        qpos_reset_seq[0] = qpos_reset_seq[i]
-        final_qpos_seq = final_qpos.copy()
-        final_qpos_seq[0] = final_qpos_seq[i].copy()
-
-        obj_pose_reset_seq = obj_pose_reset.copy()
-        obj_pose_reset_seq[0] = obj_pose_reset_seq[i].copy()
-
-        final_contact_pos_seq = final_contact_pos.copy()
-        final_contact_pos_seq[0] = final_contact_pos[i].copy()
-
-        final_contacts_seq = final_contacts.copy()
-        final_contacts_seq[0] = final_contacts[i].copy()
-
-        final_obj_pos_seq = final_obj_pos.copy()
-        final_ee_seq = final_ee.copy()
-        final_pose_seq = final_pose.copy()
-
-
-        final_obj_pos_seq[0] = final_obj_pos[i].copy()
-        final_ee_seq[0] = final_ee_seq[i].copy()
-        final_pose_seq[0] = final_pose_seq[i].copy()
-
-        obj_idx_stacked[0] =  obj_idx_stacked[i].copy()
-        obj_w_stacked[0] =  obj_w_stacked[i].copy()
-        obj_dim_stacked[0] =  obj_dim_stacked[i].copy()
-        obj_type_stacked[0] =  obj_type_stacked[i].copy()
-
-        if i>0 and obj_idx_stacked[i-1] != obj_idx_stacked[i]:
-            env.load_object(obj_idx_stacked,obj_w_stacked, obj_dim_stacked, obj_type_stacked)
-
-        env.set_goals(final_obj_pos_seq,final_ee_seq,final_pose_seq,final_contact_pos_seq,final_contacts_seq)
-        env.reset_state(qpos_reset_seq, np.zeros((num_envs,51),dtype=np.float32), obj_pose_reset_seq)
 
         set_guide=False
-        obj_pose_pos_list = []
-        hand_pose_list = []
-        joint_pos_list = []
-
         time.sleep(2)
-        for step in range(n_steps):
-            obs = env.observe(False)
+        env.move_to_first(i)
 
+        next_obs,info = env.reset(add_noise=False)
+        for step in range(n_steps):
+            obs = next_obs
             ### Get action from policy
-            action_pred = actor.architecture.architecture(torch.from_numpy(obs[:,:-meta_info_dim]).to(device))
+            action_pred = ppo.actor.architecture(torch.from_numpy(obs).to(device))
             frame_start = time.time()
 
             action_ll = action_pred.cpu().detach().numpy()
@@ -282,7 +152,7 @@ if args.vis_evaluate:
                     env.set_root_control()
                     set_guide=True
 
-            reward_ll, dones = env.step(action_ll)
+            next_obs,reward, dones,info = env.step(action_ll)
 
             frame_end = time.time()
             wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
@@ -302,36 +172,33 @@ else:
 
     set_guide=False
 
+    next_obs, info = env.reset(add_noise=False)
     for step in range(n_steps):
-        obs = env.observe(False)
-        obs = obs[:, :-4]
-        step_obs = np.zeros([num_envs,1]).astype('float32')
-        step_obs[:] = step/n_steps
-        obs = np.concatenate([obs,step_obs],axis=1)
-        #obs = pe.add(obs,step)
-        action_ll = actor.architecture.architecture(torch.from_numpy(obs).to(device))
+        obs = next_obs
+        action_ll = ppo.actor.architecture(torch.from_numpy(obs).to(device))
         frame_start = time.time()
 
         ### After grasp is established remove surface and test stability
         if step>grasp_steps and not set_guide:
-            obj_pos_fixed = obs[:,-4:-1].copy()
+            meta_info = info['meta_info']
+            obj_pos_fixed = meta_info[:,-4:-1].copy()
             env.set_root_control()
             set_guide=True
-
         ### Record slipping and displacement
         if step>(grasp_steps+1):
-            slipped_list.append(obs[:,-1].copy())
-            obj_disp = np.linalg.norm(obj_pos_fixed-obs[:,-4:-1],axis=-1)
+            meta_info = info['meta_info']
+            slipped_list.append(meta_info[:,-1].copy())
+            obj_disp = np.linalg.norm(obj_pos_fixed-meta_info[:,-4:-1],axis=-1)
             disp_list.append(obj_disp)
-            obj_pos_fixed = obs[:,-4:-1].copy()
+            obj_pos_fixed = meta_info[:,-4:-1].copy()
 
-        reward_ll, dones = env.step(action_ll.cpu().detach().numpy())
+        next_obs,reward, dones,info = env.step(action_ll.cpu().detach().numpy())
 
         frame_end = time.time()
         wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
         if wait_time > 0.:
             time.sleep(wait_time)
-
+    obj_idx_stacked = repeated_label['obj_idx_stacked']
     ### Log quantiative results
     for obj_id in np.unique(obj_idx_stacked):
         train_obj_id = obj_id + 1
