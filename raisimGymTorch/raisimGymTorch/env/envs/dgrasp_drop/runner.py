@@ -4,7 +4,6 @@ from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
 from raisimGymTorch.helper.utils import get_obj_pcd,get_args,repeat_label,setup_seed
 from raisimGymTorch.env.bin.dgrasp_drop import NormalSampler
-from raisimGymTorch.env.envs.dgrasp_test.test_func import evaluator
 import os
 import time
 import raisimGymTorch.algo.ppo.module as ppo_module
