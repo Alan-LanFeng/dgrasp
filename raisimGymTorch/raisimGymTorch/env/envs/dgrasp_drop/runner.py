@@ -50,7 +50,7 @@ def get_ppo():
                   num_learning_epochs=4,
                   gamma=0.996,
                   lam=0.95,
-                  num_mini_batches=8,
+                  num_mini_batches=4,
                   device=device,
                   log_dir=saver.data_dir,
                   shuffle_batch=False

@@ -105,17 +105,18 @@ class MLP_pcd(nn.Module):
         super().__init__()
         hidden_dim = 128
         self.hidden_dim = hidden_dim
-        self.CG_1d = CG_stacked(3, hidden_dim)
-        self.CG_pcd = CG_stacked(3, hidden_dim)
-        shape = [128, 64]
+        #self.CG_1d = CG_stacked(3, hidden_dim)
+        self.CG_pcd = CG_stacked(2, hidden_dim)
 
-        modules = [nn.Linear(hidden_dim, shape[0]), nn.LeakyReLU()]
+        shape = [128, 128]
+
+        modules = [nn.Linear(hidden_dim*2, shape[0]), nn.LeakyReLU()]
         scale = [np.sqrt(2)]
 
-        for idx in range(len(shape)-1):
-            modules.append(nn.Linear(shape[idx], shape[idx+1]))
-            modules.append(nn.LeakyReLU())
-            scale.append(np.sqrt(2))
+        # for idx in range(len(shape)-1):
+        #     modules.append(nn.Linear(shape[idx], shape[idx+1]))
+        #     modules.append(nn.LeakyReLU())
+        #     scale.append(np.sqrt(2))
         modules.append(nn.Linear(shape[-1], output_size))
 
         self.mlp = nn.Sequential(*modules)
@@ -129,32 +130,34 @@ class MLP_pcd(nn.Module):
         # self.label_embed = MLP_3([143, 128, 128, hidden_dim])
         # self.obj_embed = MLP_3([16, 128, 128, hidden_dim])
         # self.obj_pcd_embed = MLP_3([3, 128, 128, hidden_dim])
-        self.hand_embed = nn.Linear(121,hidden_dim)
-        self.label_embed = nn.Linear(143,hidden_dim)
-        self.obj_embed = nn.Linear(16,hidden_dim)
+        self.hand_embed = MLP_2([280,256,hidden_dim])
+        # self.label_embed = nn.Linear(143,hidden_dim)
+        # self.obj_embed = nn.Linear(16,hidden_dim)
         self.obj_pcd_embed = nn.Linear(3,hidden_dim)
 
     def forward(self,obs):
         n_env,_ = obs.shape
         device = obs.device
         obj_pcd = obs[:,280:].reshape(n_env,-1,3)
-        hand_info = obs[:,:121]
-        label_info = obs[:,121:264]
-        obj_info = obs[:,264:280]
-        hand_encode = self.hand_embed(hand_info).unsqueeze(1)
-        label_encode = self.label_embed(label_info).unsqueeze(1)
-        obj_info_encode = self.obj_embed(obj_info).unsqueeze(1)
-        meta_encode = torch.cat([hand_encode,label_encode,obj_info_encode],dim=1)
+        hand_info = obs[:,:280]
 
-        context = torch.ones([n_env,self.hidden_dim]).to(device)
+        hand_encode = self.hand_embed(hand_info)
+        # label_info = obs[:,121:264]
+        # obj_info = obs[:,264:280]
+        # hand_encode = self.hand_embed(hand_info).unsqueeze(1)
+        # label_encode = self.label_embed(label_info).unsqueeze(1)
+        # obj_info_encode = self.obj_embed(obj_info).unsqueeze(1)
+        # meta_encode = torch.cat([hand_encode,label_encode,obj_info_encode],dim=1)
+
+        #context = torch.ones([n_env,self.hidden_dim]).to(device)
         obj_pcd_encode = self.obj_pcd_embed(obj_pcd)
         pcd_num = obj_pcd.shape[1]
-        mask = torch.ones([n_env,3]).to(device)
-        meta_encode, context_meta = self.CG_1d(meta_encode,context,mask)
-        mask = torch.ones([n_env, pcd_num]).to(device)
-        obj_pcd_encode, context_obj = self.CG_pcd(obj_pcd_encode, context_meta, mask)
+        mask = torch.ones([n_env,pcd_num]).to(device)
+        meta_encode, context_meta = self.CG_pcd(obj_pcd_encode,hand_encode,mask)
 
-        pred = self.mlp(context_obj)
+        context = torch.cat([hand_encode,context_meta],dim=-1)
+
+        pred = self.mlp(context)
         return pred
 
     @staticmethod
@@ -173,6 +176,19 @@ class MLP_3(nn.Module):
             nn.LayerNorm(dims[2]),
             nn.ReLU(),
             nn.Linear(dims[2], dims[3])
+        )
+    def forward(self, x):
+        x = self.mlp(x)
+        return x
+
+class MLP_2(nn.Module):
+    def __init__(self, dims):
+        super(MLP_2, self).__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(dims[0], dims[1]),
+            nn.LayerNorm(dims[1]),
+            nn.ReLU(),
+            nn.Linear(dims[1], dims[2]),
         )
     def forward(self, x):
         x = self.mlp(x)
