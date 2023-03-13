@@ -130,7 +130,7 @@ class MLP_pcd(nn.Module):
         # self.label_embed = MLP_3([143, 128, 128, hidden_dim])
         # self.obj_embed = MLP_3([16, 128, 128, hidden_dim])
         # self.obj_pcd_embed = MLP_3([3, 128, 128, hidden_dim])
-        self.hand_embed = MLP_2([280,256,hidden_dim])
+        self.hand_embed = MLP_2([280,128,hidden_dim])
         # self.label_embed = nn.Linear(143,hidden_dim)
         # self.obj_embed = nn.Linear(16,hidden_dim)
         self.obj_pcd_embed = nn.Linear(3,hidden_dim)
