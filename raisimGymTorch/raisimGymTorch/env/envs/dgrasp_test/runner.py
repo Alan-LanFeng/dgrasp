@@ -37,11 +37,11 @@ def get_ppo():
     return ppo
 
 def get_ppo():
-    actor = ppo_module.Actor(ppo_module.MLP_pcd(ob_dim, act_dim),
+    actor = ppo_module.Actor(ppo_module.MLP_pn(ob_dim, act_dim),
                              ppo_module.MultivariateGaussianDiagonalCovariance(act_dim, num_envs, 1.0,
                                                                                NormalSampler(act_dim)), device)
 
-    critic = ppo_module.Critic(ppo_module.MLP_pcd(ob_dim, 1), device)
+    critic = ppo_module.Critic(ppo_module.MLP_pn(ob_dim, 1), device)
 
     ppo = PPO.PPO(actor=actor,
                   critic=critic,
@@ -86,18 +86,18 @@ meta_info_dim = 4
 num_repeats= args.num_repeats
 activations = nn.LeakyReLU
 output_activation = nn.Tanh
-
-
-
-dict_labels=joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
+if args.test:
+    dict_labels=joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
+else:
+    dict_labels = joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
 repeated_label = repeat_label(dict_labels[args.obj_id],1)
 
 num_envs = repeated_label['final_qpos'].shape[0]
 mesh_path = "../rsc/meshes_simplified/008_pudding_box/mesh_aligned.obj"
 obj_pcd = get_obj_pcd(mesh_path)
-obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], num_envs, 0)
 
 cfg['environment']['num_envs'] = 1 if args.vis_evaluate else num_envs
+obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], cfg['environment']['num_envs'], 0)
 cfg["testing"] = True if test_inference else False
 
 
