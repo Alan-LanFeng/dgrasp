@@ -7,10 +7,12 @@ import platform
 import os
 import copy
 from scipy.spatial.transform import Rotation as R
+#from raisimGymTorch.helper.utils import dgrasp_to_mano,show_pointcloud_objhand
 
 class RaisimGymVecEnv:
 
-    def __init__(self, impl, cfg, normalize_ob=False, seed=0, normalize_rew=True, clip_obs=10., label=None,
+    def __init__(self, impl, cfg, normalize_ob=False,
+                 seed=0, normalize_rew=True, clip_obs=10., label=None,
                  obj_pcd=None):
         if platform.system() == "Darwin":
             os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -119,7 +121,7 @@ class RaisimGymVecEnv:
             obj_pcd = r_obj.apply(obj_pcd.reshape(-1, dim)) - obj_pos
             obj_pcd = obj_pcd.reshape(env_num, -1).astype('float32')
             obs = np.concatenate([obs, obj_pcd], axis=-1)
-            #ret_obs['obj_pcd'] = obj_pcd.reshape(env_num,-1,3).astype('float32')
+
             # gc = copy.copy(self._observation[:,:51])
             # idx = 11
             # verts,joints = dgrasp_to_mano(self._observation[idx,:51])

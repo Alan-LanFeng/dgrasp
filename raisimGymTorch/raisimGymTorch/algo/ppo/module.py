@@ -174,7 +174,7 @@ class MLP_pn(nn.Module):
         self.hidden_dim = hidden_dim
 
         shape = [256, 128]
-        modules = [nn.Linear(hidden_dim+280, shape[0]), nn.LeakyReLU()]
+        modules = [nn.Linear(300+280, shape[0]), nn.LeakyReLU()]
         scale = [np.sqrt(2)]
         for idx in range(len(shape)-1):
             modules.append(nn.Linear(shape[idx], shape[idx+1]))
@@ -189,17 +189,17 @@ class MLP_pn(nn.Module):
         self.input_shape = [input_size]
         self.output_shape = [output_size]
 
-        self.obj_pcd_embed = PointNetEncoder(self.hidden_dim)
+        #self.obj_pcd_embed = PointNetEncoder(self.hidden_dim)
 
     def forward(self,obs):
-        n_env,_ = obs.shape
-        obj_pcd = obs[:,280:].reshape(n_env,-1,3)
-        hand_info = obs[:,:280]
+        #n_env,_ = obs.shape
+        #obj_pcd = obs[:,280:].reshape(n_env,-1,3)
+        #hand_info = obs[:,:280]
 
-        obj_pcd_encode = self.obj_pcd_embed(obj_pcd)
+        #obj_pcd_encode = self.obj_pcd_embed(obj_pcd)
 
-        feature_inp = torch.cat([hand_info,obj_pcd_encode],dim=-1)
-        pred = self.mlp(feature_inp)
+        #feature_inp = torch.cat([hand_info,obj_pcd_encode],dim=-1)
+        pred = self.mlp(obs)
         return pred
 
     @staticmethod
