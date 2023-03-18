@@ -424,10 +424,10 @@ namespace raisim {
             raisim::Vec<3> obj_pos_raisim, euler_goal_world, final_obj_pose_mat, hand_pos_world, hand_pose, act_pos, act_or_pose;
             raisim::transpose(Obj_orientation_temp,Obj_orientation);
             obj_pos_raisim[0] = final_obj_pos_[0]-Obj_Position[0]; obj_pos_raisim[1] = final_obj_pos_[1]-Obj_Position[1]; obj_pos_raisim[2] = final_obj_pos_[2]-Obj_Position[2];
-            if (time_step>60)
-            {
-                box->setPosition(1.25,0,0.0);
-            }
+//            if (time_step>60)
+//            {
+//                box->setPosition(1.25,0,0.0);
+//            }
             if (motion_synthesis)
             {
                 raisim::quatToRotMat(final_obj_pos_.tail(4),rotmat_final_obj_pos);
@@ -563,10 +563,10 @@ namespace raisim {
             rewards_.record("torque", std::max(0.0, mano_->getGeneralizedForce().squaredNorm()));
 
             live_reward=0;
-            if (time_step>60)
-            {
-            live_reward=1;
-            }
+//            if (time_step>60)
+//            {
+//            live_reward=1;
+//            }
 
             //return (1-std::min(epoch_step/decay_epochs,1.0))*rewards_.sum()+live_reward;
             return rewards_.sum()+live_reward;
@@ -788,16 +788,16 @@ namespace raisim {
 
                 return true;
             }
-            Obj_Position = obj_mesh_1->getPosition();
-
-            height_diff = obj_pos_init_[2]-Obj_Position[2];
-
-            if (height_diff>0.03)
-            {
-                //terminalReward = -1 + (1-std::min(epoch_step/decay_epochs,1.0))*rewards_.sum();
-                terminalReward = -1 + rewards_.sum();
-                return true;
-            }
+//            Obj_Position = obj_mesh_1->getPosition();
+//
+//            height_diff = obj_pos_init_[2]-Obj_Position[2];
+//
+//            if (height_diff>0.03)
+//            {
+//                //terminalReward = -1 + (1-std::min(epoch_step/decay_epochs,1.0))*rewards_.sum();
+//                terminalReward = -1 + rewards_.sum();
+//                return true;
+//            }
 
 //            if (time_step==80)
 //            {
