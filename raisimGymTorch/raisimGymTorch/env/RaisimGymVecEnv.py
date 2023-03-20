@@ -112,20 +112,31 @@ class RaisimGymVecEnv:
 
             obj_pos = copy.copy(self._observation[:, -15:-12])
             obj_euler = copy.copy(self._observation[:, -12:-9])
-
+            hand_pos = copy.copy(self._observation[:, :3])
+            hand_rot = copy.copy(self._observation[:, 3:6])
 
             r_obj = obj_euler[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
             obj_pos = obj_pos[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
             r_obj = R.from_euler('XYZ', r_obj, degrees=False)
 
             obj_pcd = r_obj.apply(obj_pcd.reshape(-1, dim)) - obj_pos
+            #obj_pcd = obj_pcd.reshape(env_num, -1).astype('float32')
+
+            r_hand = hand_rot[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
+            hand_pos = hand_pos[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
+            r_hand = R.from_euler('XYZ', r_hand, degrees=False)
+
+            obj_pcd = r_hand.apply(obj_pcd.reshape(-1, dim)) + hand_pos
             obj_pcd = obj_pcd.reshape(env_num, -1).astype('float32')
+
             obs = np.concatenate([obs, obj_pcd], axis=-1)
 
-            # gc = copy.copy(self._observation[:,:51])
-            # idx = 11
-            # verts,joints = dgrasp_to_mano(self._observation[idx,:51])
-            # show_pointcloud_objhand(verts,obj_pcd[idx].reshape(-1,3))
+            #
+            # if self.time_step%50==0:
+            #     idx =11
+            #     gc = copy.copy(self._observation[idx,:51])
+            #     verts,joints = dgrasp_to_mano(gc)
+            #     show_pointcloud_objhand(verts,obj_pcd[idx].reshape(-1,3))
 
 
         info = {}

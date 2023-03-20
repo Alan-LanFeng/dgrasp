@@ -73,9 +73,11 @@ class Critic:
 
 
 class MLP(nn.Module):
-    def __init__(self, shape, actionvation_fn, input_size, output_size):
+    def __init__(self, input_size, output_size):
         super(MLP, self).__init__()
-        self.activation_fn = actionvation_fn
+        self.activation_fn = nn.LeakyReLU
+
+        shape = [128, 128]
 
         modules = [nn.Linear(input_size, shape[0]), self.activation_fn()]
         scale = [np.sqrt(2)]
@@ -317,22 +319,26 @@ class PointNetEncoder(nn.Module):
 
         self.linear = nn.Linear(hidden_dim,hidden_dim)
         torch.nn.init.orthogonal_(self.linear.weight, gain=np.sqrt(2))
-        self.layer_norm = nn.LayerNorm(hidden_dim)
-        self.bn1 = nn.BatchNorm1d(32)
-        self.bn2 = nn.BatchNorm1d(64)
-        self.bn3 = nn.BatchNorm1d(hidden_dim)
+        # self.layer_norm = nn.LayerNorm(hidden_dim)
+        # self.bn1 = nn.BatchNorm1d(32)
+        # self.bn2 = nn.BatchNorm1d(64)
+        # self.bn3 = nn.BatchNorm1d(hidden_dim)
         self.hidden_dim = hidden_dim
 
     def forward(self, x):
+        # x = x.transpose(2,1)
+        # x = F.relu(self.bn1(self.conv1(x)))
+        # x = F.relu(self.bn2(self.conv2(x)))
+        # x = self.bn3(self.conv3(x))
+        # x = torch.max(x, 2, keepdim=True)[0]
+        # x = x.view(-1, self.hidden_dim)
+        # x = self.layer_norm(self.linear(x))
         x = x.transpose(2,1)
-
-        x = F.relu(self.bn1(self.conv1(x)))
-        x = F.relu(self.bn2(self.conv2(x)))
-        x = self.bn3(self.conv3(x))
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = self.conv3(x)
         x = torch.max(x, 2, keepdim=True)[0]
         x = x.view(-1, self.hidden_dim)
-        x = self.layer_norm(self.linear(x))
-
         return x
 
 if __name__ == '__main__':
