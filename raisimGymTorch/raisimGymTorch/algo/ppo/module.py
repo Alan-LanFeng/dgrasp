@@ -104,7 +104,7 @@ class MLP(nn.Module):
          enumerate(mod for mod in sequential if isinstance(mod, nn.Linear))]
 
 
-class MLP_pcd(nn.Module):
+class mcg_pcd(nn.Module):
     def __init__(self,input_size, output_size):
         super().__init__()
         hidden_dim = 128
@@ -169,7 +169,47 @@ class MLP_pcd(nn.Module):
         [torch.nn.init.orthogonal_(module.weight, gain=scales[idx]) for idx, module in
          enumerate(mod for mod in sequential if isinstance(mod, nn.Linear))]
 
-class MLP_pn(nn.Module):
+class pn_pcd(nn.Module):
+    def __init__(self,input_size, output_size):
+        super().__init__()
+        hidden_dim = 128
+        self.hidden_dim = hidden_dim
+
+        shape = [256, 128]
+        modules = [nn.Linear(hidden_dim+280, shape[0]), nn.LeakyReLU()]
+        scale = [np.sqrt(2)]
+        for idx in range(len(shape)-1):
+            modules.append(nn.Linear(shape[idx], shape[idx+1]))
+            modules.append(nn.LeakyReLU())
+            scale.append(np.sqrt(2))
+        modules.append(nn.Linear(shape[-1], output_size))
+
+        self.mlp = nn.Sequential(*modules)
+        scale.append(np.sqrt(2))
+        self.init_weights(self.mlp, scale)
+
+        self.input_shape = [input_size]
+        self.output_shape = [output_size]
+
+        self.obj_pcd_embed = PointNetEncoder(self.hidden_dim)
+
+    def forward(self,obs):
+        n_env,_ = obs.shape
+        obj_pcd = obs[:,280:].reshape(n_env,-1,3)
+        hand_info = obs[:,:280]
+
+        obj_pcd_encode = self.obj_pcd_embed(obj_pcd)
+
+        feature_inp = torch.cat([hand_info,obj_pcd_encode],dim=-1)
+        pred = self.mlp(feature_inp)
+        return pred
+
+    @staticmethod
+    def init_weights(sequential, scales):
+        [torch.nn.init.orthogonal_(module.weight, gain=scales[idx]) for idx, module in
+         enumerate(mod for mod in sequential if isinstance(mod, nn.Linear))]
+
+class mlp_pcd(nn.Module):
     def __init__(self,input_size, output_size):
         super().__init__()
         hidden_dim = 128

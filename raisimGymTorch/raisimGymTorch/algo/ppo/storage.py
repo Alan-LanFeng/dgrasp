@@ -75,7 +75,8 @@ class RolloutStorage:
         size = self.actions.shape[0]
         for step in reversed(range(size)):
             if step == size - 1:
-                next_non_terminal = 1.0 - self.dones[step]
+                #next_non_terminal = 1.0 - self.dones[step]
+                next_non_terminal = 0
                 next_values = last_values
             else:
                 next_non_terminal = 1.0 - self.episode_starts[step+1]

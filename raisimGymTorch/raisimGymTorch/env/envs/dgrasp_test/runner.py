@@ -37,11 +37,11 @@ def get_ppo():
     return ppo
 
 def get_ppo():
-    actor = ppo_module.Actor(ppo_module.MLP_pcd(ob_dim, act_dim),
+    actor = ppo_module.Actor(ppo_module.MLP(ob_dim, act_dim),
                              ppo_module.MultivariateGaussianDiagonalCovariance(act_dim, num_envs, 1.0,
                                                                                NormalSampler(act_dim)), device)
 
-    critic = ppo_module.Critic(ppo_module.MLP_pcd(ob_dim, 1), device)
+    critic = ppo_module.Critic(ppo_module.MLP(ob_dim, 1), device)
 
     ppo = PPO.PPO(actor=actor,
                   critic=critic,
