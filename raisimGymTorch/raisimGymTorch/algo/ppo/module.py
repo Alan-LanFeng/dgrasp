@@ -112,15 +112,15 @@ class mcg_pcd(nn.Module):
         #self.CG_1d = CG_stacked(3, hidden_dim)
         self.CG_pcd = CG_stacked(2, hidden_dim)
 
-        shape = [128, 128]
+        shape = [256, 128]
 
         modules = [nn.Linear(hidden_dim*2, shape[0]), nn.LeakyReLU()]
         scale = [np.sqrt(2)]
 
-        # for idx in range(len(shape)-1):
-        #     modules.append(nn.Linear(shape[idx], shape[idx+1]))
-        #     modules.append(nn.LeakyReLU())
-        #     scale.append(np.sqrt(2))
+        for idx in range(len(shape)-1):
+            modules.append(nn.Linear(shape[idx], shape[idx+1]))
+            modules.append(nn.LeakyReLU())
+            scale.append(np.sqrt(2))
         modules.append(nn.Linear(shape[-1], output_size))
 
         self.mlp = nn.Sequential(*modules)
