@@ -16,32 +16,13 @@ import math
 
 import joblib
 
-def get_ppo():
-    actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['policy_net'], nn.LeakyReLU, ob_dim, act_dim),
+
+def get_ppo(mod):
+    actor = ppo_module.Actor(mod(ob_dim, act_dim),
                              ppo_module.MultivariateGaussianDiagonalCovariance(act_dim, num_envs, 1.0,
                                                                                NormalSampler(act_dim)), device)
 
-    critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['value_net'], nn.LeakyReLU, ob_dim, 1), device)
-
-    ppo = PPO.PPO(actor=actor,
-                  critic=critic,
-                  num_envs=num_envs,
-                  num_transitions_per_env=n_steps,
-                  num_learning_epochs=4,
-                  gamma=0.996,
-                  lam=0.95,
-                  num_mini_batches=4,
-                  device=device,
-                  log_dir=saver.data_dir,
-                  shuffle_batch=False
-                  )
-    return ppo
-def get_ppo():
-    actor = ppo_module.Actor(ppo_module.mcg_pcd(ob_dim, act_dim),
-                             ppo_module.MultivariateGaussianDiagonalCovariance(act_dim, num_envs, 1.0,
-                                                                               NormalSampler(act_dim)), device)
-
-    critic = ppo_module.Critic(ppo_module.mcg_pcd(ob_dim, 1), device)
+    critic = ppo_module.Critic(mod(ob_dim, 1), device)
 
     ppo = PPO.PPO(actor=actor,
                   critic=critic,
@@ -74,6 +55,15 @@ print(f"Experiment name: \"{args.exp_name}\"")
 
 ### load config
 cfg = YAML().load(open(task_path+'/cfgs/' + args.cfg, 'r'))
+if cfg['module'] == 'MLP':
+    mod = ppo_module.MLP
+    cfg['environment']['get_pcd'] = False
+    cfg['environment']['extra_dim'] = 1
+elif cfg['module'] == 'mcg':
+    mod = ppo_module.mcg_pcd
+    cfg['environment']['get_pcd'] = True
+    cfg['environment']['extra_dim'] = 301
+
 wandb.init(project='dgrasp',config=cfg)
 
 cfg['seed']=args.seed
@@ -110,7 +100,8 @@ total_steps = n_steps * env.num_envs
 saver = ConfigurationSaver(log_dir = exp_path + "/raisimGymTorch/" + args.storedir + "/" + args.exp_name,
                            save_items=[task_path + "/cfgs/" + args.cfg, task_path + "/Environment.hpp", task_path + "/runner.py"], test_dir=False)
 
-ppo = get_ppo()
+
+ppo = get_ppo(mod)
 
 avg_rewards = []
 
