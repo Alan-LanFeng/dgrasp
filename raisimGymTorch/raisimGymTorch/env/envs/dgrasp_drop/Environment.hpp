@@ -844,6 +844,7 @@ namespace raisim {
         bool nohierarchy = false;
         bool contact_pruned = false;
         bool motion_synthesis = false;
+        bool fall = false;
         raisim::Vec<3> pose_goal, pos_goal, up_vec, up_gen_vec, obj_pose_, Position, Obj_Position, Rel_fpos, Obj_linvel, Obj_qvel, Fpos_world, init_root_;
         raisim::Mat<3,3> Obj_orientation, Obj_orientation_temp, Body_orientation, init_or_, root_pose_world_, init_rot_;
         raisim::Vec<4> obj_quat;
