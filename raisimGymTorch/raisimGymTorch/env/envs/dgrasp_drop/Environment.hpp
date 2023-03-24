@@ -92,7 +92,6 @@ namespace raisim {
             obDouble_.setZero(obDim_);
 
             root_guided =  cfg["root_guided"].As<bool>();
-            fall = cfg["fall"].As<bool>();
             float finger_action_std = cfg["finger_action_std"].As<float>();
             float rot_action_std = cfg["rot_action_std"].As<float>();
 
@@ -235,22 +234,14 @@ namespace raisim {
 
         /// Resets the object and hand to its initial pose
         void reset() final {
-
+            time_step=0;
             if (first_reset_)
             {
                 first_reset_=false;
             }
             else{
-                Eigen::VectorXd jointPgain(gvDim_), jointDgain(gvDim_);
-                jointPgain.head(3).setConstant(50);
-                jointDgain.head(3).setConstant(0.1);
-                jointPgain.tail(nJoints_).setConstant(50.0);
-                jointDgain.tail(nJoints_).setConstant(0.2);
-                mano_->setPdGains(jointPgain, jointDgain);
-                time_step=0;
                 /// all settings to initial state configuration
                 actionMean_.setZero();
-                actionMean_.tail(nJoints_-3) = gc_set_.tail(nJoints_-3);
                 mano_->setState(gc_set_, gv_set_);
                 if (cylinder_mesh)
                 {
@@ -289,7 +280,6 @@ namespace raisim {
 
             /// reset gains (only required in case for inference)
             time_step=0;
-            epoch_step++;
             Eigen::VectorXd jointPgain(gvDim_), jointDgain(gvDim_);
             jointPgain.head(3).setConstant(50);
             jointDgain.head(3).setConstant(0.1);
@@ -427,16 +417,12 @@ namespace raisim {
         /// This function takes an environment step given an action (51DoF) input
         float step(const Eigen::Ref<EigenVec>& action) final {
             time_step++;
-
             raisim::Vec<4> obj_orientation_quat, quat_final_pose, quat_world;
             raisim::Mat<3, 3> rot, rot_trans, rot_world, rot_goal, rotmat_final_obj_pos, rotmat_final_obj_pos_trans;
             raisim::Vec<3> obj_pos_raisim, euler_goal_world, final_obj_pose_mat, hand_pos_world, hand_pose, act_pos, act_or_pose;
             raisim::transpose(Obj_orientation_temp,Obj_orientation);
             obj_pos_raisim[0] = final_obj_pos_[0]-Obj_Position[0]; obj_pos_raisim[1] = final_obj_pos_[1]-Obj_Position[1]; obj_pos_raisim[2] = final_obj_pos_[2]-Obj_Position[2];
-            if (time_step>60 && fall)
-            {
-                box->setPosition(1.25,0,0.0);
-            }
+
             if (motion_synthesis)
             {
                 raisim::quatToRotMat(final_obj_pos_.tail(4),rotmat_final_obj_pos);
@@ -571,14 +557,7 @@ namespace raisim {
             rewards_.record("body_qvel_reward_", std::max(0.0,body_qvel_reward_));
             rewards_.record("torque", std::max(0.0, mano_->getGeneralizedForce().squaredNorm()));
 
-            live_reward=0;
-            if (time_step>60&&fall)
-            {
-            live_reward=1;
-            }
-
-            //return (1-std::min(epoch_step/decay_epochs,1.0))*rewards_.sum()+live_reward;
-            return rewards_.sum()+live_reward;
+            return rewards_.sum();
         }
 
         /// This function computes and updates the observation/state space
@@ -726,26 +705,22 @@ namespace raisim {
 //            box->getPosition(0,table_pos);
             /// add all features to observation
             obDouble_ <<
-            // hand info
                     gc_,
                     bodyLinearVel_,
                     bodyAngularVel_,
                     gv_.tail(gvDim_ - 6),
-                    impulses_,
-                    rel_body_table_pos_,
-
-            // label info
                     rel_body_pos_,
                     rel_pose_,
-                    final_contact_array_,
-                    rel_contacts_,
-            // obj info
                     rel_objpalm_pos_,
-                    obj_pose_.e(),
-                    rel_obj_pos_,
                     rel_obj_vel,
-                    rel_obj_qvel;
-
+                    rel_obj_qvel,
+                    final_contact_array_,
+                    impulses_,
+                    rel_contacts_,
+                    rel_obj_pos_,
+                    rel_body_table_pos_,
+                    obj_pose_.e();
+                    //table_pos.e();
         }
 
         /// Set observation in wrapper to current observation
@@ -801,19 +776,16 @@ namespace raisim {
 
             height_diff = obj_pos_init_[2]-Obj_Position[2];
 
-            if (height_diff>0.03&&fall)
-            {
-                //terminalReward = -1 + (1-std::min(epoch_step/decay_epochs,1.0))*rewards_.sum();
-                terminalReward = -1 + rewards_.sum();
-                return true;
-            }
-
-//            if (time_step==80)
+//            if (height_diff>0.05)
 //            {
-//                terminalReward = 1 + (1-std::min(epoch_step/decay_epochs,1))*rewards_.sum() ;
+//                terminalReward = -5 + rewards_.sum() ;
 //                return true;
 //            }
-
+//            if (time_step>190)
+//            {
+//                terminalReward = 10;
+//                return true;
+//            }
 
             return false;
         }
@@ -847,10 +819,6 @@ namespace raisim {
         double num_active_contacts_;
         double impulse_reward_ = 0.0;
         double obj_weight_;
-        double decay_epochs = 500;
-        double live_reward = 0;
-        bool fall = false;
-
         Eigen::VectorXd joint_limit_high, joint_limit_low, actionMean_, actionStd_, obDouble_, rel_pose_, finger_weights_, rel_obj_pos_, rel_objpalm_pos_, rel_body_pos_, rel_contact_pos_, rel_contacts_, contacts_, impulses_, rel_obj_pose_;
         Eigen::Vector3d bodyLinearVel_, bodyAngularVel_, rel_obj_qvel, rel_obj_vel, up_pose, rel_body_table_pos_;
         std::set<size_t> footIndices_;
@@ -866,7 +834,6 @@ namespace raisim {
         int root_guiding_counter_ = 0;
         int obj_idx_;
         int time_step;
-        int epoch_step=0;
         bool root_guided=false;
         bool cylinder_mesh=false;
         bool box_obj_mesh=false;
