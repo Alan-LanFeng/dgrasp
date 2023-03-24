@@ -776,14 +776,16 @@ namespace raisim {
 
             height_diff = obj_pos_init_[2]-Obj_Position[2];
 
-//            if (height_diff>0.05)
+            if (height_diff>0.03&&fall)
+            {
+                //terminalReward = -1 + (1-std::min(epoch_step/decay_epochs,1.0))*rewards_.sum();
+                terminalReward = -1 + rewards_.sum();
+                return true;
+            }
+
+//            if (time_step==80)
 //            {
-//                terminalReward = -5 + rewards_.sum() ;
-//                return true;
-//            }
-//            if (time_step>190)
-//            {
-//                terminalReward = 10;
+//                terminalReward = 1 + (1-std::min(epoch_step/decay_epochs,1))*rewards_.sum() ;
 //                return true;
 //            }
 
