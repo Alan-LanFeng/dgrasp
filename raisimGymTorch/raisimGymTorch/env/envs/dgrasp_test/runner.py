@@ -3,6 +3,7 @@ from raisimGymTorch.env.bin import dgrasp_test as mano
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.env.bin.dgrasp_test import NormalSampler
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
+from raisimGymTorch.helper.utils import concat_dict
 import os
 import time
 import raisimGymTorch.algo.ppo.module as ppo_module
@@ -79,14 +80,18 @@ if args.test:
     dict_labels=joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
 else:
     dict_labels = joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
-repeated_label = repeat_label(dict_labels[args.obj_id],1)
+
+
+dict_labels = concat_dict(dict_labels)
+repeated_label = repeat_label(dict_labels,1)
 
 num_envs = repeated_label['final_qpos'].shape[0]
-mesh_path = "../rsc/meshes_simplified/008_pudding_box/mesh_aligned.obj"
-obj_pcd = get_obj_pcd(mesh_path)
+# mesh_path = "../rsc/meshes_simplified/008_pudding_box/mesh_aligned.obj"
+# obj_pcd = get_obj_pcd(mesh_path)
+obj_pcd = None
 
 cfg['environment']['num_envs'] = 1 if args.vis_evaluate else num_envs
-obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], cfg['environment']['num_envs'], 0)
+#obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], cfg['environment']['num_envs'], 0)
 cfg["testing"] = True if test_inference else False
 
 

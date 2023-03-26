@@ -7,6 +7,16 @@ import torch
 import random
 import os
 
+def concat_dict(dict):
+    ret = {}
+    for key in dict.keys():
+        for k in dict[key].keys():
+            if k in ret.keys():
+                ret[k] = np.concatenate((ret[k], dict[key][k]), axis=0)
+            else:
+                ret[k] = dict[key][k]
+    return ret
+
 IDX_TO_OBJ = {
     1: ['002_master_chef_can',0.414, 0, [0.051,0.139,0.0]],
     2: ['003_cracker_box', 0.453, 1, [0.06, 0.158, 0.21]],
@@ -40,10 +50,10 @@ def setup_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-def get_obj_pcd(path):
+def get_obj_pcd(path,num_p=100):
     mesh = o3d.io.read_triangle_mesh(path, enable_post_processing=True)
     mesh.remove_duplicated_vertices()
-    obj_vertices = mesh.sample_points_uniformly(number_of_points=100)
+    obj_vertices = mesh.sample_points_uniformly(number_of_points=num_p)
     obj_vertices = np.asarray(obj_vertices.points)
 
     return obj_vertices

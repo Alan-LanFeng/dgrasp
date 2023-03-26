@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 #from torch.utils.tensorboard import SummaryWriter
-from .storage import RolloutStorage
+from .old_storage import RolloutStorage
 
 
 class PPO:

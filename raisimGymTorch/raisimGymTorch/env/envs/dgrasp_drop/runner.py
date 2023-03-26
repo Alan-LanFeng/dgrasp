@@ -2,7 +2,7 @@ from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin import dgrasp_drop as mano
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
-from raisimGymTorch.helper.utils import get_obj_pcd,get_args,repeat_label,setup_seed
+from raisimGymTorch.helper.utils import get_obj_pcd,get_args,repeat_label,setup_seed,concat_dict
 from raisimGymTorch.env.bin.dgrasp_drop import NormalSampler
 import os
 import time
@@ -76,18 +76,22 @@ reward_clip = cfg['environment']['reward_clip']
 
 dict_labels=joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
 
+dict_labels=joblib.load("raisimGymTorch/data/test.pkl")
+dict_labels = concat_dict(dict_labels)
+for k,v in dict_labels.items():
+    dict_labels[k] = v[:10]
 
-
-repeated_label = repeat_label(dict_labels[args.obj_id],args.num_repeats)
+repeated_label = repeat_label(dict_labels,args.num_repeats)
 num_envs = repeated_label['final_qpos'].shape[0]
 cfg['environment']['num_envs'] = num_envs
 cfg["testing"] = True if args.test else False
 print('num envs', num_envs)
 
 # get obj pcd
-mesh_path = "../rsc/meshes_simplified/008_pudding_box/mesh_aligned.obj"
-obj_pcd = get_obj_pcd(mesh_path)
-obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], num_envs, 0)
+# mesh_path = "../rsc/meshes_simplified/008_pudding_box/mesh_aligned.obj"
+# obj_pcd = get_obj_pcd(mesh_path)
+# obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], num_envs, 0)
+obj_pcd = None
 
 env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'],label=repeated_label,obj_pcd=obj_pcd)
 
@@ -116,7 +120,7 @@ for update in range(args.num_iterations):
     average_dones = 0.
 
     ### Store policy
-    if update % cfg['environment']['eval_every_n'] == 0:
+    if update % cfg['environment']['eval_every_n'] == 0 and update:
         print("Visualizing and evaluating the current policy")
         torch.save({
             'actor_architecture_state_dict': ppo.actor.architecture.state_dict(),
@@ -131,7 +135,7 @@ for update in range(args.num_iterations):
         exp = pathes[-2]
         weight = pathes[-1]+ "/full_" + str(update) + '.pt'
         os.system(
-            f'python raisimGymTorch/env/envs/dgrasp_test/runner.py -o  7 -e {exp} -w {weight} -sd {sd} -t')
+            f'python raisimGymTorch/env/envs/dgrasp_test/runner.py -o  7 -e {exp} -w {weight} -sd {sd}')
 
     next_obs,info = env.reset()
     done_array = np.zeros(num_envs)
