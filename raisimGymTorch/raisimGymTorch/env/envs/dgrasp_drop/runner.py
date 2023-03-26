@@ -40,7 +40,6 @@ def get_ppo(mod):
 
 
 ### configuration of command line arguments
-
 args = get_args()
 setup_seed(args.seed)
 
@@ -64,7 +63,7 @@ elif cfg['module'] == 'mcg':
     cfg['environment']['get_pcd'] = True
     cfg['environment']['extra_dim'] = 301
 
-wandb.init(project='dgrasp',config=cfg)
+wandb.init(project='dgrasp',config=cfg,name = args.exp_name)
 
 cfg['seed']=args.seed
 
@@ -73,7 +72,12 @@ num_envs = cfg['environment']['num_envs']
 pre_grasp_steps = cfg['environment']['pre_grasp_steps']
 trail_steps = cfg['environment']['trail_steps']
 reward_clip = cfg['environment']['reward_clip']
+
+
 dict_labels=joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
+
+
+
 repeated_label = repeat_label(dict_labels[args.obj_id],args.num_repeats)
 num_envs = repeated_label['final_qpos'].shape[0]
 cfg['environment']['num_envs'] = num_envs

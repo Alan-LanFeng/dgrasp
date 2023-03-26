@@ -88,25 +88,7 @@ class RolloutStorage:
         # in David Silver Lecture 4: https://www.youtube.com/watch?v=PnHCvfgC_ZA
         self.returns = self.advantages + self.values
 
-        # advantage = 0
-        # val_with_last = np.concatenate([self.values,last_values.unsqueeze(0).cpu().numpy()],axis=0)
-        # a = first_nonzero(self.dones[...,0],0)
-        # for i in range(len(a)):
-        #     if a[i]==-1:continue
-        #     indx = a[i].item()
-        #     val_with_last[indx+1:,i]=0
-        #     self.rewards[indx+1:,i]=0
-        #     self.mask[indx+1:,i]=False
-        #     self.dones[indx:, i] = 1
-        # for step in reversed(range(self.num_transitions_per_env)):
-        #     next_values = val_with_last[step + 1]
-        #     next_is_not_terminal = 1.0 - self.dones[step]
-        #     delta = self.rewards[step] + next_is_not_terminal * gamma * next_values - val_with_last[step]
-        #     advantage = delta + next_is_not_terminal * gamma * lam * advantage
-        #     self.returns[step] = advantage + val_with_last[step]
-        #
-        # # Compute and normalize the advantages
-        # self.advantages = self.returns - self.values
+
         self.advantages = (self.advantages - self.advantages.mean()) / (self.advantages.std() + 1e-8)
 
         # Convert to torch variables
