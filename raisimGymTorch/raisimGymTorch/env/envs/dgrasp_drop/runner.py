@@ -68,7 +68,6 @@ wandb.init(project='dgrasp',config=cfg,name = args.exp_name)
 cfg['seed']=args.seed
 
 ### get experiment parameters
-num_envs = cfg['environment']['num_envs']
 pre_grasp_steps = cfg['environment']['pre_grasp_steps']
 trail_steps = cfg['environment']['trail_steps']
 reward_clip = cfg['environment']['reward_clip']
@@ -78,8 +77,8 @@ dict_labels=joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
 
 dict_labels=joblib.load("raisimGymTorch/data/test.pkl")
 dict_labels = concat_dict(dict_labels)
-for k,v in dict_labels.items():
-    dict_labels[k] = v[:10]
+# for k,v in dict_labels.items():
+#     dict_labels[k] = v[:10]
 
 repeated_label = repeat_label(dict_labels,args.num_repeats)
 num_envs = repeated_label['final_qpos'].shape[0]

@@ -797,16 +797,33 @@ namespace raisim {
 
                 return true;
             }
-            Obj_Position = obj_mesh_1->getPosition();
 
-            height_diff = obj_pos_init_[2]-Obj_Position[2];
+            if (fall){
 
-            if (height_diff>0.03&&fall)
-            {
-                //terminalReward = -1 + (1-std::min(epoch_step/decay_epochs,1.0))*rewards_.sum();
-                terminalReward = -1 + rewards_.sum();
-                return true;
+                if (cylinder_mesh)
+                {
+                    Obj_Position = cylinder->getPosition();
+
+                }
+                else if (box_obj_mesh)
+                {
+                    Obj_Position = box_obj->getPosition();
+                }
+                else
+                {
+                    Obj_Position = obj_mesh_1->getPosition();
+                }
+                height_diff = obj_pos_init_[2]-Obj_Position[2];
+
+                if (height_diff>0.05)
+                {
+                    //terminalReward = -1 + (1-std::min(epoch_step/decay_epochs,1.0))*rewards_.sum();
+                    terminalReward = -1 + rewards_.sum();
+                    return true;
+                }
             }
+
+
 
 //            if (time_step==80)
 //            {
