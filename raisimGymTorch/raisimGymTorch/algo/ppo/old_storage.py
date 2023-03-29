@@ -78,7 +78,7 @@ class RolloutStorage:
             self.returns[step] = advantage + val_with_last[step]
 
         # Compute and normalize the advantages
-        self.advantages = self.returns - self.values
+        self.advantages = self.returns - val_with_last[:-1]
         self.advantages = (self.advantages - self.advantages.mean()) / (self.advantages.std() + 1e-8)
 
         # Convert to torch variables

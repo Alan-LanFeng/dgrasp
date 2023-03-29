@@ -109,7 +109,7 @@ class PPO:
             for actor_obs_batch, critic_obs_batch, actions_batch, old_sigma_batch, old_mu_batch, current_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch,mask \
                     in self.batch_sampler(self.num_mini_batches):
                 mask = mask.squeeze(-1)
-                mask[:] = True
+                #mask[:] = True
                 valid_sum = max(mask.sum(),1)
 
                 actions_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, actions_batch)

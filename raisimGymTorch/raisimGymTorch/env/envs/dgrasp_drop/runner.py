@@ -134,7 +134,7 @@ for update in range(args.num_iterations):
         exp = pathes[-2]
         weight = pathes[-1]+ "/full_" + str(update) + '.pt'
         os.system(
-            f'python raisimGymTorch/env/envs/dgrasp_test/runner.py -o  7 -e {exp} -w {weight} -sd {sd}')
+            f'python raisimGymTorch/env/envs/dgrasp_test/runner.py -o  7 -e {exp} -w {weight} -sd {sd} -ao')
 
     next_obs,info = env.reset()
     done_array = np.zeros(num_envs)
