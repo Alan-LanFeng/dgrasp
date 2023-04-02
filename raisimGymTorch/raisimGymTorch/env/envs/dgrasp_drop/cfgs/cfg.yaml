@@ -1,6 +1,6 @@
 seed: 1
 record_video: yes
-module: MLP
+module: mcg
 
 environment:
   get_pcd: True

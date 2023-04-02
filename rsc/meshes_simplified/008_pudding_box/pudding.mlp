@@ -1,0 +1,22 @@
+<!DOCTYPE MeshLabDocument>
+<MeshLabProject>
+ <MeshGroup>
+  <MLMesh label="Box" filename="textured_aligned.obj">
+   <MLMatrix44>
+1 0 0 0 
+0 1 0 0 
+0 0 1 0 
+0 0 0 1 
+</MLMatrix44>
+  </MLMesh>
+  <MLMesh label="textured.obj" filename="../../../../meshes/008_pudding_box/textured.obj">
+   <MLMatrix44>
+0.999934 -0.00656693 0.00940337 -0.000365968 
+0.00664177 0.999946 -0.00795 0.000179021 
+-0.00935066 0.00801194 0.999924 -0.000499663 
+0 0 0 1 
+</MLMatrix44>
+  </MLMesh>
+ </MeshGroup>
+ <RasterGroup/>
+</MeshLabProject>

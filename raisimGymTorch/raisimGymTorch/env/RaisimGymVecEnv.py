@@ -7,6 +7,7 @@ import platform
 import os
 import copy
 from scipy.spatial.transform import Rotation as R
+from raisimGymTorch.helper.utils import IDX_TO_OBJ, get_obj_pcd
 #from raisimGymTorch.helper.utils import dgrasp_to_mano,show_pointcloud_objhand
 
 class RaisimGymVecEnv:
@@ -33,12 +34,25 @@ class RaisimGymVecEnv:
         self.time_step = 0
         self.n_steps =  cfg['pre_grasp_steps']+ cfg['trail_steps']
         # if obj_pcd:
-        self.obj_pcd = obj_pcd
+
         self.load_object(label['obj_idx_stacked'], label['obj_w_stacked'], label['obj_dim_stacked'],
                          label['obj_type_stacked'])
         self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
                        label['final_contacts'])
         self.get_pcd = cfg['get_pcd']
+
+        if self.get_pcd:
+            self.obj_pcd = np.zeros([self.num_envs,100,3])
+            for obj_id in np.unique(label['obj_idx_stacked']):
+
+                obj = IDX_TO_OBJ[obj_id+1][0]
+
+                obj_pcd = get_obj_pcd(
+                    f'../rsc/meshes_simplified/{obj}/textured_simple.obj')
+                obj_num = np.sum(label['obj_idx_stacked']==obj_id)
+                obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], obj_num, 0)
+                idx = np.where(label['obj_idx_stacked']==obj_id)[0]
+                self.obj_pcd[idx] = obj_pcd
 
     def load_object(self, obj_idx, obj_weight, obj_dim, obj_type):
         self.wrapper.load_object(obj_idx, obj_weight, obj_dim, obj_type)

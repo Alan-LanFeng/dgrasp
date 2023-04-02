@@ -31,7 +31,7 @@ def get_ppo(mod):
                   num_learning_epochs=4,
                   gamma=0.996,
                   lam=0.95,
-                  num_mini_batches=4,
+                  num_mini_batches=8,
                   device=device,
                   log_dir=saver.data_dir,
                   shuffle_batch=False
@@ -90,9 +90,9 @@ print('num envs', num_envs)
 # mesh_path = "../rsc/meshes_simplified/008_pudding_box/mesh_aligned.obj"
 # obj_pcd = get_obj_pcd(mesh_path)
 # obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], num_envs, 0)
-obj_pcd = None
+#obj_pcd = None
 
-env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'],label=repeated_label,obj_pcd=obj_pcd)
+env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'],label=repeated_label)
 
 ### Setting dimensions from environments
 ob_dim = env.obsdim_for_agent
