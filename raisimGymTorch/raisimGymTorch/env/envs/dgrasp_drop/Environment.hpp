@@ -300,7 +300,8 @@ namespace raisim {
             Eigen::VectorXd gen_force;
             gen_force.setZero(gcDim_);
             mano_->setGeneralizedForce(gen_force);
-
+            raisim::Vec<3> table_pos;
+            box->getPosition(0,table_pos);
             /// reset box position/orientation/velocity
             box->clearExternalForcesAndTorques();
             box->setPosition(1.25, 0, 0.25);
@@ -725,6 +726,7 @@ namespace raisim {
 //            raisim::Vec<3> table_pos;
 //            box->getPosition(0,table_pos);
             /// add all features to observation
+
             obDouble_ <<
             // hand info
                     gc_,
