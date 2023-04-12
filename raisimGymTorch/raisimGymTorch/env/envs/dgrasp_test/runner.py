@@ -79,7 +79,15 @@ output_activation = nn.Tanh
 if args.test:
     dict_labels=joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
 else:
-    dict_labels = joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
+    dict_labels = joblib.load("raisimGymTorch/data/dexycb_grasptta_train.pkl")
+    # get the first row of array in dict_labels.
+    # The structure of dict_labels is {1:{'a']:array, 'b':array}, 2:{'a']:array, 'b':array}}
+    # here is the code
+    for key in dict_labels:
+        for key2 in dict_labels[key]:
+            dict_labels[key][key2] = dict_labels[key][key2][[0]]
+
+
 
 
 dict_labels = concat_dict(dict_labels)

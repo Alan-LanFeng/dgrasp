@@ -49,8 +49,9 @@ class RaisimGymVecEnv:
             label_to_move = v[i].copy()
             self.label[k][0] = label_to_move
         label = self.label
-
-        self.wrapper.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
+        self.load_object(label['obj_idx_stacked'], label['obj_w_stacked'], label['obj_dim_stacked'],
+                         label['obj_type_stacked'])
+        self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
                        label['final_contacts'])
 
     def set_goals(self, obj_pos, ee_pos, pose, contact_pos, normals):
