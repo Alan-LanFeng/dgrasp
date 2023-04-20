@@ -300,7 +300,7 @@ namespace raisim {
             Eigen::VectorXd gen_force;
             gen_force.setZero(gcDim_);
             mano_->setGeneralizedForce(gen_force);
-            raisim::Vec<3> table_pos;
+
             box->getPosition(0,table_pos);
             /// reset box position/orientation/velocity
             box->clearExternalForcesAndTorques();
@@ -819,6 +819,7 @@ namespace raisim {
                 height_diff = obj_pos_init_[2]-Obj_Position[2];
                 if (height_diff>0.05)
                 {
+                    box->getPosition(0,table_pos);
                     // print warning
                     std::cout << "Warning: Object is falling" << std::endl;
                     std::cout << "Object position: " << Obj_Position[0] << " " << Obj_Position[1] << " " << Obj_Position[2] << std::endl;
@@ -921,7 +922,7 @@ namespace raisim {
         bool nohierarchy = false;
         bool contact_pruned = false;
         bool motion_synthesis = false;
-        raisim::Vec<3> pose_goal, pos_goal, up_vec, up_gen_vec, obj_pose_, Position, Obj_Position, Rel_fpos, Obj_linvel, Obj_qvel, Fpos_world, init_root_;
+        raisim::Vec<3> pose_goal, pos_goal, up_vec, up_gen_vec, obj_pose_, Position, Obj_Position, Rel_fpos, Obj_linvel, Obj_qvel, Fpos_world, init_root_,table_pos;
         raisim::Mat<3,3> Obj_orientation, Obj_orientation_temp, Body_orientation, init_or_, root_pose_world_, init_rot_;
         raisim::Vec<4> obj_quat;
         std::vector<int> contact_idxs_;
