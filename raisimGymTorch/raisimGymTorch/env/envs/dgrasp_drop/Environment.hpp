@@ -509,15 +509,6 @@ namespace raisim {
                     Obj_orientation_temp = obj_mesh_1->getRotationMatrix();
                     obj_mesh_1->getQuaternion(obj_quat);
                 }
-                // calulate the object z axis displacement to init pos
-                obj_z_disp = Obj_Position[2] - obj_pos_init_[2];
-                // max obj z axis displacement is lift_dist
-                if (obj_z_disp > lift_dist)
-                    obj_z_disp = lift_dist;
-
-                live_reward = obj_z_disp*;
-
-
 
                 /// Convert final root hand translation back from (current) object into world frame
                 raisim::matvecmul(Obj_orientation_temp, final_ee_pos_.head(3), Fpos_world);
