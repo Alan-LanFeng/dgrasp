@@ -62,9 +62,9 @@ class RolloutStorage:
         self.mask[:] = True
         advantage = 0
 
-        bug_epoch = self.dones[...,0].sum(-1)
+        bug_epoch = self.dones[...,0].sum(0)
         bug_epoch = bug_epoch.astype(bool)
-        self.mask[bug_epoch] = False
+        self.mask[:,bug_epoch] = False
 
         val_with_last = np.concatenate([self.values,last_values.unsqueeze(0).cpu().numpy()],axis=0)
         for step in reversed(range(self.num_transitions_per_env)):
