@@ -435,27 +435,6 @@ namespace raisim {
             raisim::transpose(Obj_orientation_temp,Obj_orientation);
             obj_pos_raisim[0] = final_obj_pos_[0]-Obj_Position[0]; obj_pos_raisim[1] = final_obj_pos_[1]-Obj_Position[1]; obj_pos_raisim[2] = final_obj_pos_[2]-Obj_Position[2];
 
-            if (time_step == 50)
-            {
-                if (cylinder_mesh)
-                {
-                    Obj_Position = cylinder->getPosition();
-                }
-                else if (box_obj_mesh)
-                {
-                    Obj_Position = box_obj->getPosition();
-                }
-                else
-                {
-                    Obj_Position = obj_mesh_1->getPosition();
-                }
-                height_diff = obj_pos_init_[2]-Obj_Position[2];
-                if (height_diff>0.05)
-                {
-                    // print warning
-                    std::cout << "Warning: Object is falling" << std::endl;
-                }
-            }
 
             if (time_step>60 && fall)
             {
@@ -821,6 +800,29 @@ namespace raisim {
                 terminalReward = 0;
 
                 return true;
+            }
+
+           if (time_step == 50)
+            {
+                if (cylinder_mesh)
+                {
+                    Obj_Position = cylinder->getPosition();
+                }
+                else if (box_obj_mesh)
+                {
+                    Obj_Position = box_obj->getPosition();
+                }
+                else
+                {
+                    Obj_Position = obj_mesh_1->getPosition();
+                }
+                height_diff = obj_pos_init_[2]-Obj_Position[2];
+                if (height_diff>0.05)
+                {
+                    // print warning
+                    std::cout << "Warning: Object is falling" << std::endl;
+                    return true;
+                }
             }
 
             if (fall){
