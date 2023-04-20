@@ -59,17 +59,14 @@ class RolloutStorage:
     def compute_returns(self, last_values, critic, gamma, lam):
         with torch.no_grad():
             self.values = critic.predict(torch.from_numpy(self.critic_obs).to(self.device)).cpu().numpy()
-
+        self.mask[:] = True
         advantage = 0
+
+        bug_epoch = self.dones[...,0].sum(-1)
+        bug_epoch = bug_epoch.astype(bool)
+        self.mask[bug_epoch] = False
+
         val_with_last = np.concatenate([self.values,last_values.unsqueeze(0).cpu().numpy()],axis=0)
-        a = first_nonzero(self.dones[...,0],0)
-        for i in range(len(a)):
-            if a[i]==-1:continue
-            indx = a[i].item()
-            val_with_last[indx+1:,i]=0
-            self.rewards[indx+1:,i]=0
-            self.mask[indx+1:,i]=False
-            self.dones[indx:, i] = 1
         for step in reversed(range(self.num_transitions_per_env)):
             next_values = val_with_last[step + 1]
             next_is_not_terminal = 1.0 - self.dones[step]

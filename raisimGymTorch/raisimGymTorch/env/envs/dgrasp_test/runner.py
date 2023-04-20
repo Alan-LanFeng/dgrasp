@@ -87,7 +87,7 @@ else:
         for key2 in dict_labels[key]:
             dict_labels[key][key2] = dict_labels[key][key2][[0]]
 
-
+dict_labels = joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
 
 
 dict_labels = concat_dict(dict_labels)
