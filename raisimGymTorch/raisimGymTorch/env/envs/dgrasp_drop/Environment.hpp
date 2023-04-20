@@ -300,7 +300,7 @@ namespace raisim {
             Eigen::VectorXd gen_force;
             gen_force.setZero(gcDim_);
             mano_->setGeneralizedForce(gen_force);
-
+            raisim::Vec<3> table_pos;
             box->getPosition(0,table_pos);
             /// reset box position/orientation/velocity
             box->clearExternalForcesAndTorques();
@@ -509,6 +509,15 @@ namespace raisim {
                     Obj_orientation_temp = obj_mesh_1->getRotationMatrix();
                     obj_mesh_1->getQuaternion(obj_quat);
                 }
+                // calulate the object z axis displacement to init pos
+                obj_z_disp = Obj_Position[2] - obj_pos_init_[2];
+                // max obj z axis displacement is lift_dist
+                if (obj_z_disp > lift_dist)
+                    obj_z_disp = lift_dist;
+
+                live_reward = obj_z_disp*;
+
+
 
                 /// Convert final root hand translation back from (current) object into world frame
                 raisim::matvecmul(Obj_orientation_temp, final_ee_pos_.head(3), Fpos_world);
@@ -574,13 +583,7 @@ namespace raisim {
             rewards_.record("body_qvel_reward_", std::max(0.0,body_qvel_reward_));
             rewards_.record("torque", std::max(0.0, mano_->getGeneralizedForce().squaredNorm()));
 
-            live_reward=0;
-            if (time_step>60&&fall)
-            {
-            live_reward=1;
-            }
 
-            //return (1-std::min(epoch_step/decay_epochs,1.0))*rewards_.sum()+live_reward;
             return rewards_.sum()+live_reward;
         }
 
@@ -819,6 +822,7 @@ namespace raisim {
                 height_diff = obj_pos_init_[2]-Obj_Position[2];
                 if (height_diff>0.2)
                 {
+                    raisim::Vec<3> table_pos;
                     box->getPosition(0,table_pos);
                     // print warning
                     std::cout << "Warning: Object is falling" << std::endl;
@@ -922,7 +926,7 @@ namespace raisim {
         bool nohierarchy = false;
         bool contact_pruned = false;
         bool motion_synthesis = false;
-        raisim::Vec<3> pose_goal, pos_goal, up_vec, up_gen_vec, obj_pose_, Position, Obj_Position, Rel_fpos, Obj_linvel, Obj_qvel, Fpos_world, init_root_,table_pos;
+        raisim::Vec<3> pose_goal, pos_goal, up_vec, up_gen_vec, obj_pose_, Position, Obj_Position, Rel_fpos, Obj_linvel, Obj_qvel, Fpos_world, init_root_;
         raisim::Mat<3,3> Obj_orientation, Obj_orientation_temp, Body_orientation, init_or_, root_pose_world_, init_rot_;
         raisim::Vec<4> obj_quat;
         std::vector<int> contact_idxs_;
