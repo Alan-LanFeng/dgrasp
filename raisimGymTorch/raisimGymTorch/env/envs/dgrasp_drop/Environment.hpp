@@ -817,7 +817,7 @@ namespace raisim {
                     Obj_Position = obj_mesh_1->getPosition();
                 }
                 height_diff = obj_pos_init_[2]-Obj_Position[2];
-                if (height_diff>0.05)
+                if (height_diff>0.2)
                 {
                     box->getPosition(0,table_pos);
                     // print warning
