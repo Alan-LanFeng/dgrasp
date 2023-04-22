@@ -76,11 +76,15 @@ reward_clip = cfg['environment']['reward_clip']
 dict_labels=joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
 
 dict_labels=joblib.load("raisimGymTorch/data/test.pkl")
-dict_labels = concat_dict(dict_labels)
+
+if args.all_objects:
+    dict_labels = concat_dict(dict_labels)
+    repeated_label = repeat_label(dict_labels, args.num_repeats)
+else:
+    repeated_label = repeat_label(dict_labels[args.obj_id], args.num_repeats)
 # for k,v in dict_labels.items():
 #     dict_labels[k] = v[:10]
 
-repeated_label = repeat_label(dict_labels,args.num_repeats)
 num_envs = repeated_label['final_qpos'].shape[0]
 cfg['environment']['num_envs'] = num_envs
 cfg["testing"] = True if args.test else False
@@ -168,7 +172,7 @@ for update in range(args.num_iterations):
 
     results = {}
     results['rewards'] = average_ll_performance
-    results['success_rate'] = success_rate
+    results['crush_rate'] = success_rate
     wandb.log(results)
 
     # print('----------------------------------------------------')

@@ -76,7 +76,10 @@ class RolloutStorage:
 
         # Compute and normalize the advantages
         self.advantages = self.returns - val_with_last[:-1]
-        self.advantages = (self.advantages - self.advantages.mean()) / (self.advantages.std() + 1e-8)
+        # calculate the mean and std of advantages, excluding the masked ones
+        adv = self.advantages[self.mask]
+
+        self.advantages = (self.advantages - adv.mean()) / (adv.std() + 1e-8)
 
         # Convert to torch variables
         self.critic_obs_tc = torch.from_numpy(self.critic_obs).to(self.device)
