@@ -87,11 +87,14 @@ else:
         for key2 in dict_labels[key]:
             dict_labels[key][key2] = dict_labels[key][key2][[0]]
 
+#dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
 dict_labels = joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
 
-
-dict_labels = concat_dict(dict_labels)
-repeated_label = repeat_label(dict_labels,1)
+if args.all_objects:
+    dict_labels = concat_dict(dict_labels)
+    repeated_label = repeat_label(dict_labels, 1)
+else:
+    repeated_label = repeat_label(dict_labels[args.obj_id], 1)
 
 num_envs = repeated_label['final_qpos'].shape[0]
 # mesh_path = "../rsc/meshes_simplified/008_pudding_box/mesh_aligned.obj"
