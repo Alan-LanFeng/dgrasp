@@ -76,6 +76,10 @@ reward_clip = cfg['environment']['reward_clip']
 dict_labels=joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
 
 dict_labels=joblib.load("raisimGymTorch/data/test.pkl")
+for key in dict_labels:
+    if key!=1:continue
+    for key2 in dict_labels[key]:
+        dict_labels[key][key2] = dict_labels[key][key2][[0,1,9,12,13,14,15,16,17,18,21,22,23,31]]
 
 if args.all_objects:
     dict_labels = concat_dict(dict_labels)
