@@ -44,12 +44,13 @@ class RaisimGymVecEnv:
         self.get_pcd = cfg['get_pcd']
 
         if self.get_pcd:
-            self.obj_pcd = np.zeros([self.num_envs, 3000, 3])
+            num_points = 300
+            self.obj_pcd = np.zeros([self.num_envs, num_points, 3])
             for obj_id in np.unique(label['obj_idx_stacked']):
                 obj = IDX_TO_OBJ[obj_id + 1][0]
 
                 obj_pcd = get_obj_pcd(
-                    f'../rsc/meshes_simplified/{obj}/textured_simple.obj',num_p=3000)
+                    f'../rsc/meshes_simplified/{obj}/textured_simple.obj',num_p=num_points)
                 obj_num = np.sum(label['obj_idx_stacked'] == obj_id)
                 obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], obj_num, 0)
                 idx = np.where(label['obj_idx_stacked'] == obj_id)[0]

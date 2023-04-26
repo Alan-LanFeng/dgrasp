@@ -32,7 +32,7 @@ def get_ppo(mod):
                   num_learning_epochs=4,
                   gamma=0.996,
                   lam=0.95,
-                  num_mini_batches=16,
+                  num_mini_batches=4,
                   device=device,
                   log_dir=saver.data_dir,
                   shuffle_batch=False
@@ -94,7 +94,7 @@ print('num envs', num_envs)
 # obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], num_envs, 0)
 obj_pcd = None
 cfg['environment']['get_pcd'] = True
-cfg['environment']['extra_dim'] = 9001
+cfg['environment']['extra_dim'] = 901
 env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
              cfg['environment'], label=repeated_label, obj_pcd=obj_pcd)
 
