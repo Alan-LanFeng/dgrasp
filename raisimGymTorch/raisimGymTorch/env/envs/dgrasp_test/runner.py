@@ -31,7 +31,7 @@ def get_ppo(mod):
                   num_learning_epochs=4,
                   gamma=0.996,
                   lam=0.95,
-                  num_mini_batches=4,
+                  num_mini_batches=32,
                   device=device,
                   log_dir=saver.data_dir,
                   shuffle_batch=False
@@ -76,29 +76,23 @@ meta_info_dim = 4
 num_repeats= args.num_repeats
 activations = nn.LeakyReLU
 output_activation = nn.Tanh
-if args.test:
-    dict_labels=joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
-else:
-    dict_labels = joblib.load("raisimGymTorch/data/dexycb_grasptta_train.pkl")
-    # get the first row of array in dict_labels.
-    # The structure of dict_labels is {1:{'a']:array, 'b':array}, 2:{'a']:array, 'b':array}}
-    # here is the code
-    for key in dict_labels:
-        for key2 in dict_labels[key]:
-            dict_labels[key][key2] = dict_labels[key][key2][[0]]
 
 
+
+
+dict_labels = joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
 dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
-#dict_labels = joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
 for key in dict_labels:
     if key!=1:continue
     for key2 in dict_labels[key]:
         dict_labels[key][key2] = dict_labels[key][key2][[0,1,9,12,13,14,15,16,17,18,21,22,23,31]]
-
+        #dict_labels[key][key2] = dict_labels[key][key2][[1,  14, 15, 18]]
+        #dict_labels[key][key2] = dict_labels[key][key2][[14, 15, 18]]
 if args.all_objects:
     dict_labels = concat_dict(dict_labels)
     repeated_label = repeat_label(dict_labels, 1)
 else:
+    #dict_labels[args.obj_id]['qpos_reset'] = dict_labels[args.obj_id]['final_qpos']
     repeated_label = repeat_label(dict_labels[args.obj_id], 1)
 
 num_envs = repeated_label['final_qpos'].shape[0]
@@ -144,7 +138,7 @@ if args.vis_evaluate:
         ### Set labels and load objects for current label (only one visualization per rollout possible)
 
         set_guide=False
-        time.sleep(2)
+        time.sleep(0.2)
         env.move_to_first(i)
 
         next_obs,info = env.reset(add_noise=False)

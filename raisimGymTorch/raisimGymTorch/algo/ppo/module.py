@@ -5,6 +5,9 @@ import torch.nn.parallel
 import torch.utils.data
 import numpy as np
 import torch.nn.functional as F
+import pytorch_lightning as pl
+from raisimGymTorch.helper.utils import get_inv
+from scipy.spatial.transform import Rotation as R
 
 class Actor:
     def __init__(self, architecture, distribution, device='cpu'):
@@ -76,12 +79,9 @@ class MLP(nn.Module):
     def __init__(self, input_size, output_size):
         super(MLP, self).__init__()
         self.activation_fn = nn.LeakyReLU
-
         shape = [128, 128]
-
         modules = [nn.Linear(input_size, shape[0]), self.activation_fn()]
         scale = [np.sqrt(2)]
-
         for idx in range(len(shape)-1):
             modules.append(nn.Linear(shape[idx], shape[idx+1]))
             modules.append(self.activation_fn())
@@ -102,6 +102,82 @@ class MLP(nn.Module):
     def init_weights(sequential, scales):
         [torch.nn.init.orthogonal_(module.weight, gain=scales[idx]) for idx, module in
          enumerate(mod for mod in sequential if isinstance(mod, nn.Linear))]
+
+class mcg_encoder(nn.Module):
+
+    def __init__(self,mcg_graspgen):
+        super().__init__()
+        self.hidden_dim = 128
+        layer_num = 3
+        self.vec_emb = MLP_3([6, 64, 128, self.hidden_dim])
+        self.obj_encode = MLP_3([3, 64, 128, self.hidden_dim])
+        self.CG_obj = CG_stacked(layer_num, self.hidden_dim)
+        # copy the param in mcg_graspgen to the encoder
+        self.vec_emb.load_state_dict(mcg_graspgen.vec_emb.state_dict())
+        self.obj_encode.load_state_dict(mcg_graspgen.obj_encode.state_dict())
+        self.CG_obj.load_state_dict(mcg_graspgen.CG_obj.state_dict())
+
+
+    def forward(self,vec,obj):
+
+        vec_embedding = self.vec_emb(vec)
+
+        pc_embedding = self.obj_encode(obj)
+
+        b,n,d = pc_embedding.shape
+        device = pc_embedding.device
+        mask = torch.ones([b, n], device=device)
+        _, context_obj = self.CG_obj(pc_embedding, vec_embedding, mask)
+
+        return context_obj
+
+class mcg_pretrain(nn.Module):
+    def __init__(self,input_size, output_size,mcg_graspgen):
+        super(mcg_pretrain, self).__init__()
+        self.mcg_encoder = mcg_encoder(mcg_graspgen)
+        # freeze the encoder
+        for param in self.mcg_encoder.parameters():
+            param.requires_grad = False
+
+        self.input_shape = [input_size]
+        self.output_shape = [output_size]
+
+        self.fc_obj = nn.Sequential(nn.Linear(128, 128), nn.LeakyReLU())
+
+        self.fc_hand = nn.Sequential(nn.Linear(280, 128), nn.LeakyReLU())
+        self.output = nn.Sequential(nn.Linear(256, 128), nn.LeakyReLU(), nn.Linear(128, output_size))
+
+    def forward(self,obs):
+        n_env, _ = obs.shape
+        device = obs.device
+        obj_pcd = obs[:, 280:].reshape(n_env, -1, 3)
+        obs_hand = obs[:, :280]
+
+        # Get object position and rotation is the wrist frame
+        obj_pos = -obs_hand[:, -15:-12]
+        obj_euler = obs_hand[:, -12:-9]
+        # Get wrist position and rotation in the object frame
+        hand_pos,hand_rot = get_inv(obj_pos.cpu().detach().numpy(),obj_euler.cpu().detach().numpy())
+        hand_pos = torch.tensor(hand_pos,dtype=torch.float32,device=device)
+
+        # change hand_rot to rotation vector
+        hand_rot = R.from_euler('XYZ', hand_rot, degrees=True).as_rotvec()
+        hand_rot = torch.tensor(hand_rot,dtype=torch.float32,device=device)
+
+        # normalize the hand position to unit vector
+        hand_pos = hand_pos / torch.norm(hand_pos, dim=1, keepdim=True)
+
+
+        vec = torch.cat([hand_pos, hand_rot], dim=1)
+
+        hand_info = obs[:, :280]
+        hand_encode = self.fc_hand(hand_info)
+        obj_pcd_encode = self.mcg_encoder(vec, obj_pcd)
+        obj_pcd_encode = self.fc_obj(obj_pcd_encode)
+
+        output = self.output(torch.cat([hand_encode, obj_pcd_encode], dim=1))
+
+        return output
 
 
 class mcg_pcd(nn.Module):
@@ -255,10 +331,10 @@ class MLP_3(nn.Module):
         self.mlp = nn.Sequential(
             nn.Linear(dims[0], dims[1]),
             nn.LayerNorm(dims[1]),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(dims[1], dims[2]),
             nn.LayerNorm(dims[2]),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(dims[2], dims[3])
         )
     def forward(self, x):
@@ -278,6 +354,25 @@ class MLP_2(nn.Module):
         x = self.mlp(x)
         return x
 
+class MCG_block(nn.Module):
+    def __init__(self,hidden_dim):
+        super(MCG_block, self).__init__()
+        self.MLP = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.GELU()
+        )
+
+    def forward(self, inp, context,mask):
+        context = context.unsqueeze(1)
+        mask = mask.unsqueeze(-1)
+
+        inp = self.MLP(inp)
+        inp=inp * context
+        inp = inp.masked_fill(mask==0,torch.tensor(-1e9))
+        context = torch.max(inp,dim=1)[0]
+        return inp,context
+
 class CG_stacked(nn.Module):
     def __init__(self,stack_num,hidden_dim):
         super(CG_stacked, self).__init__()
@@ -295,24 +390,6 @@ class CG_stacked(nn.Module):
             context_ = (context_*i+context)/(i+1)
         return inp_,context_
 
-class MCG_block(nn.Module):
-    def __init__(self,hidden_dim):
-        super(MCG_block, self).__init__()
-        self.MLP = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.LayerNorm(hidden_dim),
-            nn.ReLU()
-        )
-
-    def forward(self, inp, context,mask):
-        context = context.unsqueeze(1)
-        mask = mask.unsqueeze(-1)
-
-        inp = self.MLP(inp)
-        inp=inp * context
-        inp = inp.masked_fill(mask==0,torch.tensor(-1e9))
-        context = torch.max(inp,dim=1)[0]
-        return inp,context
 
 
 class MultivariateGaussianDiagonalCovariance(nn.Module):

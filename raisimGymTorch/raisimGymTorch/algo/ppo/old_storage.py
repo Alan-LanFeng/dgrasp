@@ -58,7 +58,9 @@ class RolloutStorage:
 
     def compute_returns(self, last_values, critic, gamma, lam):
         with torch.no_grad():
-            self.values = critic.predict(torch.from_numpy(self.critic_obs).to(self.device)).cpu().numpy()
+            t,a,dim = self.critic_obs.shape
+            for i in range(t):
+                self.values[i] = critic.predict(torch.from_numpy(self.critic_obs[i]).to(self.device)).cpu().numpy()
         self.mask[:] = True
         advantage = 0
 

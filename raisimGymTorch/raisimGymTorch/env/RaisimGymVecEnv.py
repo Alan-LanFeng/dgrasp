@@ -7,7 +7,10 @@ import platform
 import os
 import copy
 from scipy.spatial.transform import Rotation as R
-#from raisimGymTorch.helper.utils import dgrasp_to_mano,show_pointcloud_objhand
+from raisimGymTorch.helper.utils import dgrasp_to_mano,show_pointcloud_objhand
+from raisimGymTorch.helper.utils import IDX_TO_OBJ, get_obj_pcd
+
+
 
 class RaisimGymVecEnv:
 
@@ -33,12 +36,24 @@ class RaisimGymVecEnv:
         self.time_step = 0
         self.n_steps =  cfg['pre_grasp_steps']+ cfg['trail_steps']
         # if obj_pcd:
-        self.obj_pcd = obj_pcd
+
         self.load_object(label['obj_idx_stacked'], label['obj_w_stacked'], label['obj_dim_stacked'],
                          label['obj_type_stacked'])
         self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
                        label['final_contacts'])
         self.get_pcd = cfg['get_pcd']
+
+        if self.get_pcd:
+            self.obj_pcd = np.zeros([self.num_envs, 3000, 3])
+            for obj_id in np.unique(label['obj_idx_stacked']):
+                obj = IDX_TO_OBJ[obj_id + 1][0]
+
+                obj_pcd = get_obj_pcd(
+                    f'../rsc/meshes_simplified/{obj}/textured_simple.obj',num_p=3000)
+                obj_num = np.sum(label['obj_idx_stacked'] == obj_id)
+                obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], obj_num, 0)
+                idx = np.where(label['obj_idx_stacked'] == obj_id)[0]
+                self.obj_pcd[idx] = obj_pcd
 
     def load_object(self, obj_idx, obj_weight, obj_dim, obj_type):
         self.wrapper.load_object(obj_idx, obj_weight, obj_dim, obj_type)
@@ -111,23 +126,23 @@ class RaisimGymVecEnv:
             obj_pcd = self.obj_pcd
             env_num, pcd_num, dim = obj_pcd.shape
 
-            obj_pos = copy.copy(self._observation[:, -15:-12])
-            obj_euler = copy.copy(self._observation[:, -12:-9])
-            hand_pos = copy.copy(self._observation[:, :3])
-            hand_rot = copy.copy(self._observation[:, 3:6])
-
-            r_obj = obj_euler[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
-            obj_pos = obj_pos[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
-            r_obj = R.from_euler('XYZ', r_obj, degrees=False)
-
-            obj_pcd = r_obj.apply(obj_pcd.reshape(-1, dim)) - obj_pos
-            #obj_pcd = obj_pcd.reshape(env_num, -1).astype('float32')
-
-            r_hand = hand_rot[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
-            hand_pos = hand_pos[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
-            r_hand = R.from_euler('XYZ', r_hand, degrees=False)
-
-            obj_pcd = r_hand.apply(obj_pcd.reshape(-1, dim)) + hand_pos
+            # obj_pos = copy.copy(self._observation[:, -15:-12])
+            # obj_euler = copy.copy(self._observation[:, -12:-9])
+            # hand_pos = copy.copy(self._observation[:, :3])
+            # hand_rot = copy.copy(self._observation[:, 3:6])
+            #
+            # r_obj = obj_euler[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
+            # obj_pos = obj_pos[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
+            # r_obj = R.from_euler('XYZ', r_obj, degrees=False)
+            #
+            # obj_pcd = r_obj.apply(obj_pcd.reshape(-1, dim)) - obj_pos
+            # #obj_pcd = obj_pcd.reshape(env_num, -1).astype('float32')
+            #
+            # r_hand = hand_rot[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
+            # hand_pos = hand_pos[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
+            # r_hand = R.from_euler('XYZ', r_hand, degrees=False)
+            #
+            # obj_pcd = r_hand.apply(obj_pcd.reshape(-1, dim)) + hand_pos
             obj_pcd = obj_pcd.reshape(env_num, -1).astype('float32')
 
             obs = np.concatenate([obs, obj_pcd], axis=-1)

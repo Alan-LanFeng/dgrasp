@@ -6,6 +6,7 @@ from scipy.spatial.transform import Rotation as R
 import torch
 import random
 import os
+from manopth.manolayer import ManoLayer
 
 def concat_dict(dict):
     ret = {}
@@ -90,6 +91,19 @@ def dgrasp_to_mano(param):
 
     return verts,joints
 
+
+# known obj_pos and obj_rot in hand frame,
+# return the hand_pos and hand_rot in obj frame
+# hand_pose is in euler angle
+def get_inv(obj_pos, obj_rot):
+    # get hand_pos first
+    obj_rot = R.from_euler('XYZ', obj_rot, degrees=False)
+
+    hand_rot = obj_rot.inv()
+
+    hand_pos = hand_rot.apply(-obj_pos)
+    return hand_pos, hand_rot.as_euler('XYZ', degrees=False)
+
 def show_pointcloud_objhand(hand, obj):
     '''
     Draw hand and obj xyz at the same time
@@ -109,7 +123,8 @@ def show_pointcloud_objhand(hand, obj):
     pc = o3d.geometry.PointCloud()
     pc.points = o3d.utility.Vector3dVector(handObj)
     pc.colors = o3d.utility.Vector3dVector(c_hanObj)
-    o3d.visualization.draw_geometries([pc])
+    frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.1,origin=obj.mean(0))
+    o3d.visualization.draw_geometries([pc,frame])
 
 def get_args():
 
