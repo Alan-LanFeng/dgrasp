@@ -30,7 +30,7 @@ class mcg_graspgen(pl.LightningModule):
         self.MSE = torch.nn.MSELoss(reduction='none')
         self.CLS = torch.nn.CrossEntropyLoss()
 
-        self.mano_layer = ManoLayer(mano_root='/local/home/lafeng/Downloads', use_pca=True, ncomps=45)
+        self.mano_layer = ManoLayer(mano_root='raisimGymTorch/data', use_pca=True, ncomps=45)
 
     def _init_weights(self, module):
         if isinstance(module, (nn.Linear, nn.Embedding)):
