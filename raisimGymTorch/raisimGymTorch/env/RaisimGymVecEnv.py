@@ -45,7 +45,7 @@ class RaisimGymVecEnv:
 
         if self.get_pcd:
             num_points = 300
-            self.obj_pcd = np.zeros([self.num_envs, num_points, 3])
+            self.obj_pcd = np.zeros([label['obj_idx_stacked'].shape[0], num_points, 3])
             for obj_id in np.unique(label['obj_idx_stacked']):
                 obj = IDX_TO_OBJ[obj_id + 1][0]
 
@@ -60,7 +60,8 @@ class RaisimGymVecEnv:
         self.wrapper.load_object(obj_idx, obj_weight, obj_dim, obj_type)
 
     def move_to_first(self,i):
-
+        if i==0:
+            self.obj_pcd_temp = self.obj_pcd.copy()
         for k,v in self.label.items():
             label_to_move = v[i].copy()
             self.label[k][0] = label_to_move
@@ -69,6 +70,8 @@ class RaisimGymVecEnv:
                          label['obj_type_stacked'])
         self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
                        label['final_contacts'])
+
+        self.obj_pcd = self.obj_pcd_temp[[i]].copy()
 
     def set_goals(self, obj_pos, ee_pos, pose, contact_pos, normals):
         self.wrapper.set_goals(obj_pos, ee_pos, pose, contact_pos, normals)

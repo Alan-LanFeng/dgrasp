@@ -128,22 +128,22 @@ for update in range(args.num_iterations):
     average_dones = 0.
 
     ### Store policy
-    # if update % cfg['environment']['eval_every_n'] == 0 and update:
-    #     print("Visualizing and evaluating the current policy")
-    #     torch.save({
-    #         'actor_architecture_state_dict': ppo.actor.architecture.state_dict(),
-    #         'actor_distribution_state_dict': ppo.actor.distribution.state_dict(),
-    #         'critic_architecture_state_dict': ppo.critic.architecture.state_dict(),
-    #         'optimizer_state_dict': ppo.optimizer.state_dict(),
-    #     }, saver.data_dir + "/full_" + str(update) + '.pt')
-    #
-    #     env.save_scaling(saver.data_dir, str(update))
-    #     pathes = saver.data_dir.split('/')
-    #     sd = pathes[-3]
-    #     exp = pathes[-2]
-    #     weight = pathes[-1] + "/full_" + str(update) + '.pt'
-    #     os.system(
-    #         f'python raisimGymTorch/env/envs/dgrasp_test/runner.py -e {exp} -w {weight} -sd {sd} -ao')
+    if update % cfg['environment']['eval_every_n'] == 0:
+        print("Visualizing and evaluating the current policy")
+        torch.save({
+            'actor_architecture_state_dict': ppo.actor.architecture.state_dict(),
+            'actor_distribution_state_dict': ppo.actor.distribution.state_dict(),
+            'critic_architecture_state_dict': ppo.critic.architecture.state_dict(),
+            'optimizer_state_dict': ppo.optimizer.state_dict(),
+        }, saver.data_dir + "/full_" + str(update) + '.pt')
+
+        env.save_scaling(saver.data_dir, str(update))
+        pathes = saver.data_dir.split('/')
+        sd = pathes[-3]
+        exp = pathes[-2]
+        weight = pathes[-1] + "/full_" + str(update) + '.pt'
+        os.system(
+            f'python raisimGymTorch/env/envs/dgrasp_test/runner.py -e {exp} -w {weight} -sd {sd} -ao')
 
     next_obs, info = env.reset()
     done_array = np.zeros(num_envs)

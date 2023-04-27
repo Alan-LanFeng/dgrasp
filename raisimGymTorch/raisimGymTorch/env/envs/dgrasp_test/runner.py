@@ -15,14 +15,15 @@ import datetime
 import argparse
 import joblib
 from raisimGymTorch.helper.utils import get_obj_pcd,get_args,repeat_label,setup_seed
+from raisimGymTorch.algo.graspgen import mcg_graspgen
 
 
 def get_ppo(mod):
-    actor = ppo_module.Actor(mod(ob_dim, act_dim),
+    actor = ppo_module.Actor(mod_act,
                              ppo_module.MultivariateGaussianDiagonalCovariance(act_dim, num_envs, 1.0,
                                                                                NormalSampler(act_dim)), device)
 
-    critic = ppo_module.Critic(mod(ob_dim, 1), device)
+    critic = ppo_module.Critic(mod_value,device)
 
     ppo = PPO.PPO(actor=actor,
                   critic=critic,
@@ -31,13 +32,15 @@ def get_ppo(mod):
                   num_learning_epochs=4,
                   gamma=0.996,
                   lam=0.95,
-                  num_mini_batches=32,
+                  num_mini_batches=4,
                   device=device,
                   log_dir=saver.data_dir,
                   shuffle_batch=False
                   )
     return ppo
 
+
+mcg = mcg_graspgen.load_from_checkpoint('raisimGymTorch/data/gg.ckpt')
 
 
 args = get_args()
@@ -79,15 +82,8 @@ output_activation = nn.Tanh
 
 
 
-
 dict_labels = joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
-dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
-for key in dict_labels:
-    if key!=1:continue
-    for key2 in dict_labels[key]:
-        dict_labels[key][key2] = dict_labels[key][key2][[0,1,9,12,13,14,15,16,17,18,21,22,23,31]]
-        #dict_labels[key][key2] = dict_labels[key][key2][[1,  14, 15, 18]]
-        #dict_labels[key][key2] = dict_labels[key][key2][[14, 15, 18]]
+
 if args.all_objects:
     dict_labels = concat_dict(dict_labels)
     repeated_label = repeat_label(dict_labels, 1)
@@ -103,11 +99,16 @@ obj_pcd = None
 cfg['environment']['num_envs'] = 1 if args.vis_evaluate else num_envs
 #obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], cfg['environment']['num_envs'], 0)
 cfg["testing"] = True if test_inference else False
-
+cfg['environment']['get_pcd'] = True
+cfg['environment']['extra_dim'] = 901
 
 env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'],label=repeated_label,obj_pcd=obj_pcd)
 ob_dim = env.obsdim_for_agent
 act_dim = env.num_acts
+
+mod = ppo_module.mcg_pretrain
+mod_act = mod(ob_dim,act_dim,mcg)
+mod_value = mod(ob_dim,1,mcg)
 
 ### Set training step parameters
 grasp_steps = pre_grasp_steps
