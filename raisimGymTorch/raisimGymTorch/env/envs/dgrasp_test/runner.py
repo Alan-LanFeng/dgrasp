@@ -82,7 +82,7 @@ output_activation = nn.Tanh
 
 
 
-dict_labels = joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
+dict_labels = joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
 
 if args.all_objects:
     dict_labels = concat_dict(dict_labels)

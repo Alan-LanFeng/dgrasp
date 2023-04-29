@@ -8,6 +8,7 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 from raisimGymTorch.helper.utils import get_inv
 from scipy.spatial.transform import Rotation as R
+from raisimGymTorch.helper.utils import dgrasp_to_mano,show_pointcloud_objhand
 
 class Actor:
     def __init__(self, architecture, distribution, device='cpu'):
@@ -154,11 +155,18 @@ class mcg_pretrain(nn.Module):
         obs_hand = obs[:, :280]
 
         # Get object position and rotation is the wrist frame
-        obj_pos = -obs_hand[:, -15:-12]
-        obj_euler = obs_hand[:, -12:-9]
+        obj_pos = -obs_hand[:, -16:-13]
+        obj_euler = obs_hand[:, -13:-10]
         # Get wrist position and rotation in the object frame
         hand_pos,hand_rot = get_inv(obj_pos.cpu().detach().numpy(),obj_euler.cpu().detach().numpy())
         hand_pos = torch.tensor(hand_pos,dtype=torch.float32,device=device)
+
+        # idx = 0
+        # gc = obs_hand[idx, :51]
+        # gc[:3] = hand_pos
+        # gc[3:6] = torch.tensor(hand_rot,dtype=torch.float32,device=device)
+        # verts, joints = dgrasp_to_mano(gc.cpu().detach().numpy())
+        # show_pointcloud_objhand(verts, obj_pcd[idx].reshape(-1, 3).detach().cpu().numpy())
 
         # change hand_rot to rotation vector
         hand_rot = R.from_euler('XYZ', hand_rot, degrees=True).as_rotvec()
@@ -166,7 +174,6 @@ class mcg_pretrain(nn.Module):
 
         # normalize the hand position to unit vector
         hand_pos = hand_pos / torch.norm(hand_pos, dim=1, keepdim=True)
-
 
         vec = torch.cat([hand_pos, hand_rot], dim=1)
 
