@@ -76,24 +76,25 @@ meta_info_dim = 4
 num_repeats= args.num_repeats
 activations = nn.LeakyReLU
 output_activation = nn.Tanh
-if args.test:
-    dict_labels=joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
-else:
-    dict_labels = joblib.load("raisimGymTorch/data/dexycb_grasptta_train.pkl")
-    # get the first row of array in dict_labels.
-    # The structure of dict_labels is {1:{'a']:array, 'b':array}, 2:{'a']:array, 'b':array}}
-    # here is the code
-    for key in dict_labels:
-        for key2 in dict_labels[key]:
-            dict_labels[key][key2] = dict_labels[key][key2][[0]]
+# if args.test:
+#     dict_labels=joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
+# else:
+#     dict_labels = joblib.load("raisimGymTorch/data/dexycb_grasptta_train.pkl")
+#     # get the first row of array in dict_labels.
+#     # The structure of dict_labels is {1:{'a']:array, 'b':array}, 2:{'a']:array, 'b':array}}
+#     # here is the code
+#     for key in dict_labels:
+#         for key2 in dict_labels[key]:
+#             dict_labels[key][key2] = dict_labels[key][key2][[0]]
+#
+#
+# dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
+# for key in dict_labels:
+#     if key!=1:continue
+#     for key2 in dict_labels[key]:
+#         dict_labels[key][key2] = dict_labels[key][key2][[0,1,9,12,13,14,15,16,17,18,21,22,23,31]]
 
-
-dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
-#dict_labels = joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
-for key in dict_labels:
-    if key!=1:continue
-    for key2 in dict_labels[key]:
-        dict_labels[key][key2] = dict_labels[key][key2][[0,1,9,12,13,14,15,16,17,18,21,22,23,31]]
+dict_labels = joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
 
 if args.all_objects:
     dict_labels = concat_dict(dict_labels)
