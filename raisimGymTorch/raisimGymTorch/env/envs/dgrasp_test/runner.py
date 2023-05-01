@@ -16,7 +16,7 @@ import argparse
 import joblib
 from raisimGymTorch.helper.utils import get_obj_pcd,get_args,repeat_label,setup_seed
 from raisimGymTorch.algo.graspgen import mcg_graspgen
-
+from raisimGymTorch.algo.ppo.module import mcg_encoder
 
 def get_ppo(mod):
     actor = ppo_module.Actor(mod_act,
@@ -41,7 +41,9 @@ def get_ppo(mod):
 
 
 mcg = mcg_graspgen.load_from_checkpoint('raisimGymTorch/data/gg.ckpt')
-
+mcg_encoder = mcg_encoder(mcg)
+for param in mcg_encoder.parameters():
+    param.requires_grad = False
 
 args = get_args()
 setup_seed(args.seed)
@@ -82,7 +84,7 @@ output_activation = nn.Tanh
 
 
 
-dict_labels = joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
+dict_labels = joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
 
 if args.all_objects:
     dict_labels = concat_dict(dict_labels)
@@ -100,9 +102,11 @@ cfg['environment']['num_envs'] = 1 if args.vis_evaluate else num_envs
 #obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], cfg['environment']['num_envs'], 0)
 cfg["testing"] = True if test_inference else False
 cfg['environment']['get_pcd'] = True
-cfg['environment']['extra_dim'] = 901
+cfg['environment']['extra_dim'] = 129
 
 env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'],label=repeated_label,obj_pcd=obj_pcd)
+env.mcg_encoder = mcg_encoder
+
 ob_dim = env.obsdim_for_agent
 act_dim = env.num_acts
 
@@ -139,7 +143,7 @@ if args.vis_evaluate:
         ### Set labels and load objects for current label (only one visualization per rollout possible)
 
         set_guide=False
-        time.sleep(0.2)
+        #time.sleep(0.2)
         env.move_to_first(i)
 
         next_obs,info = env.reset(add_noise=False)

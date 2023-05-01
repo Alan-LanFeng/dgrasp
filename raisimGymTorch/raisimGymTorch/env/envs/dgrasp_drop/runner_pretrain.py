@@ -14,7 +14,7 @@ import torch
 import wandb
 import math
 from raisimGymTorch.algo.graspgen import mcg_graspgen
-
+from raisimGymTorch.algo.ppo.module import mcg_encoder
 import joblib
 
 
@@ -41,6 +41,9 @@ def get_ppo(mod):
 
 
 mcg = mcg_graspgen.load_from_checkpoint('raisimGymTorch/data/gg.ckpt')
+mcg_encoder = mcg_encoder(mcg)
+for param in mcg_encoder.parameters():
+    param.requires_grad = False
 
 ### configuration of command line arguments
 args = get_args()
@@ -94,10 +97,10 @@ print('num envs', num_envs)
 # obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], num_envs, 0)
 obj_pcd = None
 cfg['environment']['get_pcd'] = True
-cfg['environment']['extra_dim'] = 901
+cfg['environment']['extra_dim'] = 129
 env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)),
              cfg['environment'], label=repeated_label, obj_pcd=obj_pcd)
-
+env.mcg_encoder = mcg_encoder
 ### Setting dimensions from environments
 ob_dim = env.obsdim_for_agent
 act_dim = env.num_acts

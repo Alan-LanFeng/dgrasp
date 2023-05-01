@@ -9,8 +9,8 @@ import copy
 from scipy.spatial.transform import Rotation as R
 from raisimGymTorch.helper.utils import dgrasp_to_mano,show_pointcloud_objhand
 from raisimGymTorch.helper.utils import IDX_TO_OBJ, get_obj_pcd
-#from raisimGymTorch.helper.utils import get_inv
-
+from raisimGymTorch.helper.utils import get_inv
+import torch
 
 class RaisimGymVecEnv:
 
@@ -127,13 +127,26 @@ class RaisimGymVecEnv:
 
 
         if self.get_pcd:
-            obj_pcd = self.obj_pcd
-            env_num, pcd_num, dim = obj_pcd.shape
+            if self.time_step==0:
+                obj_pcd = self.obj_pcd
+                env_num, pcd_num, dim = obj_pcd.shape
 
-            # obj_pos = -copy.copy(obs[:, -16:-13])
-            # obj_euler = copy.copy(obs[:, -13:-10])
-            #
-            # hand_pos, hand_rot = get_inv(obj_pos, obj_euler)
+                obj_pos = -copy.copy(obs[:, -16:-13])
+                obj_euler = copy.copy(obs[:, -13:-10])
+
+                # Get wrist position and rotation in the object frame
+                hand_pos,hand_rot = get_inv(obj_pos,obj_euler)
+                hand_pos = torch.tensor(hand_pos,dtype=torch.float32)
+
+                # change hand_rot to rotation vector
+                hand_rot = R.from_euler('XYZ', hand_rot, degrees=True).as_rotvec()
+                hand_rot = torch.tensor(hand_rot,dtype=torch.float32)
+                # normalize the hand position to unit vector
+                hand_pos = hand_pos / torch.norm(hand_pos, dim=1, keepdim=True)
+
+                vec = torch.cat([hand_pos, hand_rot], dim=1)
+                self.obj_pcd_encode = self.mcg_encoder(vec, torch.tensor(obj_pcd,dtype=torch.float32))
+
             # idx = 0
             # gc = copy.copy(self._observation[idx,:51])
             # gc[:3] = hand_pos[idx]
@@ -141,9 +154,9 @@ class RaisimGymVecEnv:
             # verts, joints = dgrasp_to_mano(gc)
             # show_pointcloud_objhand(verts, obj_pcd[idx].reshape(-1, 3))
 
-            obj_pcd = obj_pcd.reshape(env_num, -1).astype('float32')
+            #obj_pcd = obj_pcd.reshape(env_num, -1).astype('float32')
 
-            obs = np.concatenate([obs, obj_pcd], axis=-1)
+            obs = np.concatenate([obs, self.obj_pcd_encode], axis=-1)
 
 
         info = {}

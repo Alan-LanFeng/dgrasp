@@ -135,10 +135,10 @@ class mcg_encoder(nn.Module):
 class mcg_pretrain(nn.Module):
     def __init__(self,input_size, output_size,mcg_graspgen):
         super(mcg_pretrain, self).__init__()
-        self.mcg_encoder = mcg_encoder(mcg_graspgen)
-        # freeze the encoder
-        for param in self.mcg_encoder.parameters():
-            param.requires_grad = False
+        # self.mcg_encoder = mcg_encoder(mcg_graspgen)
+        # # freeze the encoder
+        # for param in self.mcg_encoder.parameters():
+        #     param.requires_grad = False
 
         self.input_shape = [input_size]
         self.output_shape = [output_size]
@@ -151,36 +151,37 @@ class mcg_pretrain(nn.Module):
     def forward(self,obs):
         n_env, _ = obs.shape
         device = obs.device
-        obj_pcd = obs[:, 280:].reshape(n_env, -1, 3)
+        #obj_pcd = obs[:, 280:].reshape(n_env, -1, 3)
         obs_hand = obs[:, :280]
+        obj_pcd_encode = obs[:, 280:]
 
-        # Get object position and rotation is the wrist frame
-        obj_pos = -obs_hand[:, -16:-13]
-        obj_euler = obs_hand[:, -13:-10]
-        # Get wrist position and rotation in the object frame
-        hand_pos,hand_rot = get_inv(obj_pos.cpu().detach().numpy(),obj_euler.cpu().detach().numpy())
-        hand_pos = torch.tensor(hand_pos,dtype=torch.float32,device=device)
+    # # Get object position and rotation is the wrist frame
+    #     obj_pos = -obs_hand[:, -16:-13]
+    #     obj_euler = obs_hand[:, -13:-10]
+    #     # Get wrist position and rotation in the object frame
+    #     hand_pos,hand_rot = get_inv(obj_pos.cpu().detach().numpy(),obj_euler.cpu().detach().numpy())
+    #     hand_pos = torch.tensor(hand_pos,dtype=torch.float32,device=device)
+    #
+    #     # idx = 0
+    #     # gc = obs_hand[idx, :51]
+    #     # gc[:3] = hand_pos
+    #     # gc[3:6] = torch.tensor(hand_rot,dtype=torch.float32,device=device)
+    #     # verts, joints = dgrasp_to_mano(gc.cpu().detach().numpy())
+    #     # show_pointcloud_objhand(verts, obj_pcd[idx].reshape(-1, 3).detach().cpu().numpy())
+    #
+    #     # change hand_rot to rotation vector
+    #     hand_rot = R.from_euler('XYZ', hand_rot, degrees=True).as_rotvec()
+    #     hand_rot = torch.tensor(hand_rot,dtype=torch.float32,device=device)
+    #
+    #     # normalize the hand position to unit vector
+    #     hand_pos = hand_pos / torch.norm(hand_pos, dim=1, keepdim=True)
+    #
+    #     vec = torch.cat([hand_pos, hand_rot], dim=1)
+    #     obj_pcd_encode = self.mcg_encoder(vec, obj_pcd)
+    #     self.obj_pcd_encode = self.fc_obj(obj_pcd_encode)
 
-        # idx = 0
-        # gc = obs_hand[idx, :51]
-        # gc[:3] = hand_pos
-        # gc[3:6] = torch.tensor(hand_rot,dtype=torch.float32,device=device)
-        # verts, joints = dgrasp_to_mano(gc.cpu().detach().numpy())
-        # show_pointcloud_objhand(verts, obj_pcd[idx].reshape(-1, 3).detach().cpu().numpy())
+        hand_encode = self.fc_hand(obs_hand)
 
-        # change hand_rot to rotation vector
-        hand_rot = R.from_euler('XYZ', hand_rot, degrees=True).as_rotvec()
-        hand_rot = torch.tensor(hand_rot,dtype=torch.float32,device=device)
-
-        # normalize the hand position to unit vector
-        hand_pos = hand_pos / torch.norm(hand_pos, dim=1, keepdim=True)
-
-        vec = torch.cat([hand_pos, hand_rot], dim=1)
-
-        hand_info = obs[:, :280]
-        hand_encode = self.fc_hand(hand_info)
-        obj_pcd_encode = self.mcg_encoder(vec, obj_pcd)
-        obj_pcd_encode = self.fc_obj(obj_pcd_encode)
 
         output = self.output(torch.cat([hand_encode, obj_pcd_encode], dim=1))
 
