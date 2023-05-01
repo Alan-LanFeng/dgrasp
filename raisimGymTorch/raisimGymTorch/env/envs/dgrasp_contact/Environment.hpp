@@ -551,7 +551,7 @@ namespace raisim {
             obj_reward_ = -rel_obj_pos_.norm();
 
             /// Compute regularization rewards
-            rel_obj_reward_ = Obj_linvel.e().squaredNorm()+Obj_qvel.e().squaredNorm();
+            rel_obj_reward_ = rel_obj_qvel.squaredNorm()+rel_obj_vel.squaredNorm();
             body_vel_reward_ = bodyLinearVel_.squaredNorm();
             body_qvel_reward_ = bodyAngularVel_.squaredNorm();
             contact_reward_ = k_contact*(rel_contacts_.sum());

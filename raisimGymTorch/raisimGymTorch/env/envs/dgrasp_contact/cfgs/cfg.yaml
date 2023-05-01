@@ -45,7 +45,7 @@ environment:
     contact_reward:
       coeff: 3.0
     impulse_reward:
-      coeff: 3.0
+      coeff: 2.0
     obj_reward:
       coeff: 0.0
     obj_pose_reward_:
