@@ -181,7 +181,7 @@ class mcg_pretrain(nn.Module):
     #     self.obj_pcd_encode = self.fc_obj(obj_pcd_encode)
 
         hand_encode = self.fc_hand(obs_hand)
-
+        obj_pcd_encode = self.fc_obj(obj_pcd_encode)
 
         output = self.output(torch.cat([hand_encode, obj_pcd_encode], dim=1))
 
