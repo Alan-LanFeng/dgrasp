@@ -143,7 +143,7 @@ class mcg_pretrain(nn.Module):
         self.input_shape = [input_size]
         self.output_shape = [output_size]
 
-        self.fc_obj = nn.Sequential(nn.Linear(128, 128), nn.LeakyReLU())
+        #self.fc_obj = nn.Sequential(nn.Linear(128, 128), nn.LeakyReLU())
 
         self.fc_hand = nn.Sequential(nn.Linear(280, 128), nn.LeakyReLU())
         self.output = nn.Sequential(nn.Linear(256, 128), nn.LeakyReLU(), nn.Linear(128, output_size))
@@ -181,7 +181,7 @@ class mcg_pretrain(nn.Module):
     #     self.obj_pcd_encode = self.fc_obj(obj_pcd_encode)
 
         hand_encode = self.fc_hand(obs_hand)
-        obj_pcd_encode = self.fc_obj(obj_pcd_encode)
+        #obj_pcd_encode = self.fc_obj(obj_pcd_encode)
 
         output = self.output(torch.cat([hand_encode, obj_pcd_encode], dim=1))
 
