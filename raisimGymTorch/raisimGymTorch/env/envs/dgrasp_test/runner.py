@@ -84,7 +84,12 @@ output_activation = nn.Tanh
 
 
 
-dict_labels = joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
+dict_labels = joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
+
+# for k,v in dict_labels.items():
+#
+#     for k1,v1 in v.items():
+#         dict_labels[k][k1] = v1[:3]
 
 if args.all_objects:
     dict_labels = concat_dict(dict_labels)
@@ -94,6 +99,8 @@ else:
     repeated_label = repeat_label(dict_labels[args.obj_id], 1)
 
 num_envs = repeated_label['final_qpos'].shape[0]
+
+
 # mesh_path = "../rsc/meshes_simplified/008_pudding_box/mesh_aligned.obj"
 # obj_pcd = get_obj_pcd(mesh_path)
 obj_pcd = None
@@ -115,6 +122,7 @@ mod_act = mod(ob_dim,act_dim,mcg)
 mod_value = mod(ob_dim,1,mcg)
 
 ### Set training step parameters
+pre_grasp_steps+=40
 grasp_steps = pre_grasp_steps
 n_steps = grasp_steps  + trail_steps
 

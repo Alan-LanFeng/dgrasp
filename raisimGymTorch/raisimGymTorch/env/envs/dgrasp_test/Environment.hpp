@@ -726,7 +726,8 @@ namespace raisim {
 
             if (Obj_Position[2] < 0.1)
                 obj_table_contact = 1;
-
+            rel_pose_.setZero(nJoints_);
+            rel_body_pos_.setZero(num_bodyparts * 3);
             /// add all features to observation
             obDouble_ <<
             // hand info
