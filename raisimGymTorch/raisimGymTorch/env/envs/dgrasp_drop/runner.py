@@ -75,7 +75,7 @@ reward_clip = cfg['environment']['reward_clip']
 
 dict_labels=joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
 
-# dict_labels=joblib.load("raisimGymTorch/data/test.pkl")
+dict_labels=joblib.load("raisimGymTorch/data/test.pkl")
 # for key in dict_labels:
 #     if key!=1:continue
 #     for key2 in dict_labels[key]:
@@ -142,7 +142,7 @@ for update in range(args.num_iterations):
         exp = pathes[-2]
         weight = pathes[-1]+ "/full_" + str(update) + '.pt'
         os.system(
-            f'python raisimGymTorch/env/envs/dgrasp_test/runner.py -o  7 -e {exp} -w {weight} -sd {sd} -ao')
+            f'python raisimGymTorch/env/envs/dgrasp_test/runner.py -e {exp} -w {weight} -sd {sd} -ao')
 
     next_obs,info = env.reset()
     done_array = np.zeros(num_envs)

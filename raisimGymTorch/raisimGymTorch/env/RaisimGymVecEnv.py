@@ -34,6 +34,7 @@ class RaisimGymVecEnv:
         self.n_steps =  cfg['pre_grasp_steps']+ cfg['trail_steps']
         # if obj_pcd:
         self.obj_pcd = obj_pcd
+        label['final_contact_pos'] = np.zeros_like(label['final_contacts'])
         self.load_object(label['obj_idx_stacked'], label['obj_w_stacked'], label['obj_dim_stacked'],
                          label['obj_type_stacked'])
         self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
