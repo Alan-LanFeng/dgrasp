@@ -815,11 +815,11 @@ namespace raisim {
 
                     box->getPosition(0,table_pos);
                     // print warning
-                    std::cout << "Warning: Object is falling" << std::endl;
-                    std::cout << "Object position: " << Obj_Position[0] << " " << Obj_Position[1] << " " << Obj_Position[2] << std::endl;
-                    std::cout << "Table position: " << table_pos[0] << " " << table_pos[1] << " " << table_pos[2] << std::endl;
-                    // if nan in table position, reset
-                    std::cout << "Table position has NaN, reset table!" << std::endl;
+//                    std::cout << "Warning: Object is falling" << std::endl;
+//                    std::cout << "Object position: " << Obj_Position[0] << " " << Obj_Position[1] << " " << Obj_Position[2] << std::endl;
+//                    std::cout << "Table position: " << table_pos[0] << " " << table_pos[1] << " " << table_pos[2] << std::endl;
+//                    // if nan in table position, reset
+//                    std::cout << "Table position has NaN, reset table!" << std::endl;
                     if (table_pos.e().hasNaN())
                     {
                         // delete table box and reinitialize
