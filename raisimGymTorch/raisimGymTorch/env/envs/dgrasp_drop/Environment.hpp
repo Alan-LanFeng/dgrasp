@@ -29,7 +29,7 @@ namespace raisim {
             /// add mano
             std::string hand_model =  cfg["hand_model"].As<std::string>();
             resourceDir_ = resourceDir;
-            mano_ = world_->addArticulatedSystem(resourceDir+"/mano/"+hand_model,"",{},raisim::COLLISION(0),raisim::COLLISION(0)|raisim::COLLISION(2)|raisim::COLLISION(63));
+            mano_ = world_->addArticulatedSystem(resourceDir+"/mano/"+hand_model,"",{},raisim::COLLISION(0),raisim::COLLISION(0)|raisim::COLLISION(1)|raisim::COLLISION(2)|raisim::COLLISION(63));
             mano_->setName("mano");
 
             /// add table
