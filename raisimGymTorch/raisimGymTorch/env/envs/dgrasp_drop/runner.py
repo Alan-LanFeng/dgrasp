@@ -146,6 +146,7 @@ for update in range(args.num_iterations):
 
     next_obs,info = env.reset()
     done_array = np.zeros(num_envs)
+    reward_array = np.zeros([n_steps, num_envs])
     for step in range(n_steps):
 
         obs = next_obs
@@ -156,14 +157,20 @@ for update in range(args.num_iterations):
         done_array+=dones
         reward.clip(min=reward_clip)
         ppo.step(value_obs=obs, rews=reward, dones=dones)
-        reward_ll_sum = reward_ll_sum + np.sum(reward)
+        reward_array[step] = reward
+        #reward_ll_sum = reward_ll_sum + np.sum(reward)
 
     obs = next_obs
     ### Update policy
+    dones = done_array.astype(bool)
+    reward_array[:,dones] = 0
+    reward_ll_sum = np.sum(reward_array)
+    total_steps = total_steps - np.sum(dones)*n_steps
     success_rate = (num_envs - done_array.astype(bool).sum())/num_envs
 
     ppo.update(actor_obs=obs, value_obs=obs, log_this_iteration=update % 10 == 0, update=update)
     average_ll_performance = reward_ll_sum / total_steps
+
     average_dones = done_sum / total_steps
     avg_rewards.append(average_ll_performance)
 
