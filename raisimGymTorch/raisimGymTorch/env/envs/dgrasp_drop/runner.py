@@ -165,13 +165,13 @@ for update in range(args.num_iterations):
     dones = done_array.astype(bool)
     reward_array[:,dones] = 0
     reward_ll_sum = np.sum(reward_array)
-    total_steps = total_steps - np.sum(dones)*n_steps
+    valid_step = total_steps - np.sum(dones)*n_steps
     success_rate = (num_envs - done_array.astype(bool).sum())/num_envs
 
     ppo.update(actor_obs=obs, value_obs=obs, log_this_iteration=update % 10 == 0, update=update)
-    average_ll_performance = reward_ll_sum / total_steps
+    average_ll_performance = reward_ll_sum / valid_step
 
-    average_dones = done_sum / total_steps
+    average_dones = done_sum / valid_step
     avg_rewards.append(average_ll_performance)
 
     ppo.actor.distribution.enforce_minimum_std((torch.ones(act_dim)*0.2).to(device))
