@@ -88,13 +88,14 @@ output_activation = nn.Tanh
 #             dict_labels[key][key2] = dict_labels[key][key2][[0]]
 #
 #
-# dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
-# for key in dict_labels:
-#     if key!=1:continue
-#     for key2 in dict_labels[key]:
-#         dict_labels[key][key2] = dict_labels[key][key2][[0,1,9,12,13,14,15,16,17,18,21,22,23,31]]
-
 dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
+for key in dict_labels:
+    #if key!=1:continue
+    for key2 in dict_labels[key]:
+        dict_labels[key][key2] = dict_labels[key][key2][-10:]
+
+#dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
+#dict_labels=joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
 
 if args.all_objects:
     dict_labels = concat_dict(dict_labels)
@@ -145,11 +146,12 @@ if args.vis_evaluate:
         ### Set labels and load objects for current label (only one visualization per rollout possible)
 
         set_guide=False
-        time.sleep(2)
         env.move_to_first(i)
 
         next_obs,info = env.reset(add_noise=False)
         for step in range(n_steps):
+            if step>grasp_steps:
+                print()
             obs = next_obs
             ### Get action from policy
             action_pred = ppo.actor.architecture(torch.from_numpy(obs).to(device))

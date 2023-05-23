@@ -65,30 +65,26 @@ def first_nonzero(arr, axis, invalid_val=-1):
     return torch.where(mask.any(axis=axis), mask.argmax(axis=axis), invalid_val)
 
 def dgrasp_to_mano(param):
-    eulers = param[6:].reshape(-1, 3).copy()
+    bs = param.shape[0]
+    eulers = param[:,6:].reshape(bs,-1, 3).copy()
 
     # exchange ring finger and little finger's sequence
-    temp = eulers[6:9].copy()
-    eulers[6:9] = eulers[9:12]
-    eulers[9:12] = temp
+    temp = eulers[:,6:9].copy()
+    eulers[:,6:9] = eulers[:,9:12]
+    eulers[:,9:12] = temp
 
+    eulers = eulers.reshape(-1,3)
     # change euler angle to axis angle
     rotvec = R.from_euler('XYZ', eulers, degrees=False)
-    rotvec = rotvec.as_rotvec().reshape(-1)
-    global_orient = R.from_euler('XYZ', param[3:6], degrees=False)
+    rotvec = rotvec.as_rotvec().reshape(bs,-1)
+    global_orient = R.from_euler('XYZ', param[:,3:6], degrees=False)
     global_orient = global_orient.as_rotvec()
 
     # translation minus a offset
-    offset = np.array([0.09566993, 0.00638343, 0.00618631])
-    mano_param = np.concatenate([global_orient, rotvec, param[:3] - offset])
+    offset = np.array([[0.09566993, 0.00638343, 0.00618631]])
+    mano_param = np.concatenate([global_orient, rotvec, param[:,:3] - offset],axis=1)
 
-    mano_param = mano_param[np.newaxis]
-    mano_layer = ManoLayer(mano_root='/local/home/lafeng/Desktop/dgrasp/manopth/mano/models',use_pca=False)
-    verts,joints = mano_layer(th_pose_coeffs=torch.tensor(mano_param[:,:48],dtype=torch.float32),th_trans = torch.tensor(mano_param[:,48:],dtype=torch.float32))
-    verts = verts[0]/1000
-    joints = joints[0]/1000
-
-    return verts,joints
+    return mano_param
 
 def show_pointcloud_objhand(hand, obj):
     '''

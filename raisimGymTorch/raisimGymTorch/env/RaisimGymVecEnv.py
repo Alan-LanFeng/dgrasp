@@ -7,7 +7,9 @@ import platform
 import os
 import copy
 from scipy.spatial.transform import Rotation as R
-#from raisimGymTorch.helper.utils import dgrasp_to_mano,show_pointcloud_objhand
+from raisimGymTorch.helper.utils import dgrasp_to_mano,show_pointcloud_objhand
+import torch
+from manopth.manolayer import ManoLayer
 
 class RaisimGymVecEnv:
 
@@ -40,6 +42,14 @@ class RaisimGymVecEnv:
         self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
                        label['final_contacts'])
         self.get_pcd = cfg['get_pcd']
+
+        mano_layer = ManoLayer(mano_root='raisimGymTorch/data', flat_hand_mean=False, ncomps=45, use_pca=True)
+        mean_axisang = mano_layer.th_hands_mean
+        self.th_comps = mano_layer.th_comps.numpy()
+
+        mean_pca = torch.einsum('bi,ij->bj', [mean_axisang, torch.inverse(mano_layer.th_comps)])
+
+        self.mean_pca = mean_pca.numpy()
 
     def load_object(self, obj_idx, obj_weight, obj_dim, obj_type):
         self.wrapper.load_object(obj_idx, obj_weight, obj_dim, obj_type)
@@ -76,8 +86,28 @@ class RaisimGymVecEnv:
     def step(self, action):
         self.time_step+=1
         self.wrapper.step(action, self._reward, self._done)
+
         obs, info = self.observe()
-        return obs, self._reward.copy(), self._done.copy(), info
+
+        reward = self._reward.copy()
+        reward+=self.get_pca_rewards(obs)
+
+        return obs, reward, self._done.copy(), info
+
+    def get_pca_rewards(self, obs):
+        bs = obs.shape[0]
+        mano_param = dgrasp_to_mano(obs[:, :51])
+
+        joint_pca = np.matmul(mano_param[:,3:48], np.linalg.inv(self.th_comps))
+        joint_pca_norm = joint_pca / np.linalg.norm(joint_pca, axis=-1, keepdims=True)
+
+        pca_target = self.mean_pca.repeat(bs, 0)
+        pca_target_norm = pca_target / np.linalg.norm(pca_target, axis=-1, keepdims=True)
+
+        pca_dist = joint_pca_norm * pca_target_norm
+        cos_sim = pca_dist.sum(-1)-1
+        cos_sim[cos_sim>-0.7] *= 0.1
+        return cos_sim*0.5
 
     def load_scaling(self, dir_name, iteration, count=1e5):
         mean_file_name = dir_name + "/mean" + str(iteration) + ".csv"
