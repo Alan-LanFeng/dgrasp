@@ -149,16 +149,14 @@ if args.vis_evaluate:
         env.move_to_first(i)
 
         next_obs,info = env.reset(add_noise=False)
+        time.sleep(1)
         for step in range(n_steps):
-            if step>grasp_steps:
-                print()
             obs = next_obs
             ### Get action from policy
             action_pred = ppo.actor.architecture(torch.from_numpy(obs).to(device))
             frame_start = time.time()
 
             action_ll = action_pred.cpu().detach().numpy()
-
             ### After grasp is established remove surface and test stability
             if step>grasp_steps:
                 if not set_guide:
