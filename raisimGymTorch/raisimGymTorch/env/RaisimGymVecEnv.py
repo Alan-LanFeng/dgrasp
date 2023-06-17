@@ -7,9 +7,10 @@ import platform
 import os
 import copy
 from scipy.spatial.transform import Rotation as R
-from raisimGymTorch.helper.utils import dgrasp_to_mano,show_pointcloud_objhand
+from raisimGymTorch.helper.utils import dgrasp_to_mano,show_pointcloud_objhand,IDX_TO_OBJ
 import torch
 from manopth.manolayer import ManoLayer
+
 
 class RaisimGymVecEnv:
 
@@ -37,7 +38,7 @@ class RaisimGymVecEnv:
         # if obj_pcd:
         self.obj_pcd = obj_pcd
         label['final_contact_pos'] = np.zeros_like(label['final_contacts'])
-        self.load_object(label['obj_idx_stacked'], label['obj_w_stacked'], label['obj_dim_stacked'],
+        self.load_object(label['obj_name'], label['obj_w_stacked'], label['obj_dim_stacked'],
                          label['obj_type_stacked'])
         self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
                        label['final_contacts'])
@@ -51,8 +52,6 @@ class RaisimGymVecEnv:
 
         self.mean_pca = mean_pca.numpy()
 
-    def load_object(self, obj_idx, obj_weight, obj_dim, obj_type):
-        self.wrapper.load_object(obj_idx, obj_weight, obj_dim, obj_type)
 
     def move_to_first(self,i):
 
@@ -60,13 +59,10 @@ class RaisimGymVecEnv:
             label_to_move = v[i].copy()
             self.label[k][0] = label_to_move
         label = self.label
-        self.load_object(label['obj_idx_stacked'], label['obj_w_stacked'], label['obj_dim_stacked'],
+        self.load_object(label['obj_name'], label['obj_w_stacked'], label['obj_dim_stacked'],
                          label['obj_type_stacked'])
         self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
                        label['final_contacts'])
-
-    def set_goals(self, obj_pos, ee_pos, pose, contact_pos, normals):
-        self.wrapper.set_goals(obj_pos, ee_pos, pose, contact_pos, normals)
 
     def seed(self, seed=None):
         self.wrapper.setSeed(seed)
@@ -107,7 +103,7 @@ class RaisimGymVecEnv:
         pca_dist = joint_pca_norm * pca_target_norm
         cos_sim = pca_dist.sum(-1)-1
         cos_sim[cos_sim>-0.4] *= 0.1
-        return cos_sim*0.5
+        return cos_sim
 
     def load_scaling(self, dir_name, iteration, count=1e5):
         mean_file_name = dir_name + "/mean" + str(iteration) + ".csv"
@@ -204,6 +200,9 @@ class RaisimGymVecEnv:
         return obs, info
 
     def load_object(self, obj_idx, obj_weight, obj_dim, obj_type):
+        #obj_idx = [IDX_TO_OBJ[obj_id+1][0] for obj_id in obj_idx]
+        obj_idx = [str(obj_id) for obj_id in obj_idx]
+        obj_type = obj_type.astype('int32')
         self.wrapper.load_object(obj_idx, obj_weight, obj_dim, obj_type)
 
     def reset_state(self, init_state, init_vel, obj_pose):

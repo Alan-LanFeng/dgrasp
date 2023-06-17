@@ -6,7 +6,7 @@ environment:
   get_pcd: True
   metainfo_dim: 4
   extra_dim: 301
-  render: False
+  render: True
   num_envs: 21
   num_repeats: 1
   eval_every_n: 200
@@ -28,7 +28,7 @@ environment:
   finger_action_std: 0.015
   rot_action_std: 0.01
   pre_grasp_steps: 60
-  trail_steps: 135
+  trail_steps: 50
   reward_clip: -2.0
   reward:
     pos_reward:

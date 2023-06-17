@@ -70,10 +70,11 @@ class VectorizedEnvironment {
       env->reset();
   }
 
-    void load_object(Eigen::Ref<EigenRowMajorMatInt> &obj_idx, Eigen::Ref<EigenRowMajorMat> &obj_weight, Eigen::Ref<EigenRowMajorMat>& obj_dim, Eigen::Ref<EigenRowMajorMatInt>& obj_type) {
+    void load_object(std::vector<std::string> &obj_idx, Eigen::Ref<EigenRowMajorMat> &obj_weight, Eigen::Ref<EigenRowMajorMat>& obj_dim, Eigen::Ref<EigenRowMajorMatInt>& obj_type) {
 #pragma omp parallel for
+
         for (int i = 0; i < num_envs_; i++)
-            environments_[i]->load_object(obj_idx.row(i), obj_weight.row(i), obj_dim.row(i), obj_type.row(i));
+            environments_[i]->load_object(obj_idx[i], obj_weight.row(i), obj_dim.row(i), obj_type.row(i));
     }
 
   void reset_state(Eigen::Ref<EigenRowMajorMat> &init_state, Eigen::Ref<EigenRowMajorMat> &init_vel, Eigen::Ref<EigenRowMajorMat> &obj_pose) {

@@ -88,13 +88,13 @@ output_activation = nn.Tanh
 #             dict_labels[key][key2] = dict_labels[key][key2][[0]]
 #
 #
-dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
+dict_labels = joblib.load("raisimGymTorch/data/test_acr.pkl")
 for key in dict_labels:
     #if key!=1:continue
     for key2 in dict_labels[key]:
-        dict_labels[key][key2] = dict_labels[key][key2][-10:]
+        dict_labels[key][key2] = dict_labels[key][key2][:2]
 
-#dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
+dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
 #dict_labels=joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
 
 if args.all_objects:
@@ -209,10 +209,9 @@ else:
         wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
         if wait_time > 0.:
             time.sleep(wait_time)
-    obj_idx_stacked = repeated_label['obj_idx_stacked']
+    obj_idx_stacked = repeated_label['obj_name']
     ### Log quantiative results
     for obj_id in np.unique(obj_idx_stacked):
-        train_obj_id = obj_id + 1
 
         ### compute testing window
         sim_dt = cfg['environment']['simulation_dt']
@@ -245,7 +244,7 @@ else:
         std_disp =  np.array(disps).std()*1000
 
         print('----------------------------------------------------')
-        print('{:<40} {:>6}'.format("object: ", obj_id+1))
+        print("object: "+str(obj_id))
         print('{:<40} {:>6}'.format("success: ", '{:0.3f}'.format(avg_slip)))
         print('{:<40} {:>6}'.format("disp mean: ", '{:0.3f}'.format(avg_disp)))
         print('{:<40} {:>6}'.format("disp std: ", '{:0.3f}'.format(std_disp)))

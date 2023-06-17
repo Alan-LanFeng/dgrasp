@@ -136,9 +136,9 @@ def get_args():
 def repeat_label(label_dict, num_repeats):
     ret = {}
     for k,v in label_dict.items():
-        if 'type' in k or 'idx' in k:
+        if 'type' in k or 'idx' in k or 'name' in k:
             ret[k] = np.repeat(v, num_repeats, 0)
-        else:
+        else :
             ret[k] = np.repeat(v,num_repeats,0).astype('float32')
 
     return ret

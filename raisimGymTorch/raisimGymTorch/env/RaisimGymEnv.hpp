@@ -53,7 +53,7 @@ class RaisimGymEnv {
   ////////////////////////////////////////
 
   /////// optional methods ///////
-  virtual void load_object(const Eigen::Ref<EigenVecInt>& obj_idx, const Eigen::Ref<EigenVec>& obj_weight, const Eigen::Ref<EigenVec>& obj_dim, const Eigen::Ref<EigenVecInt>& obj_type){};
+  virtual void load_object(const std::string &obj_idx, const Eigen::Ref<EigenVec>& obj_weight, const Eigen::Ref<EigenVec>& obj_dim, const Eigen::Ref<EigenVecInt>& obj_type){};
   virtual void curriculumUpdate() {};
   virtual void close() { if(server_) server_->killServer(); };
   virtual void setSeed(int seed) {};
