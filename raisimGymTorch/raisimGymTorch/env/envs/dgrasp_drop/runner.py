@@ -73,9 +73,8 @@ trail_steps = cfg['environment']['trail_steps']
 reward_clip = cfg['environment']['reward_clip']
 
 
-dict_labels=joblib.load("raisimGymTorch/data/dexycb_train_labels.pkl")
+dict_labels=joblib.load("raisimGymTorch/data/dexycb_train_graspgen.pkl")
 
-dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
 for key in dict_labels:
     #if key!=1:continue
     for key2 in dict_labels[key]:

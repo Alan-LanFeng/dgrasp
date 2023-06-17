@@ -15,6 +15,7 @@ import datetime
 import argparse
 import joblib
 from raisimGymTorch.helper.utils import get_obj_pcd,get_args,repeat_label,setup_seed
+from scipy.spatial.transform import Rotation as R
 
 
 def get_ppo(mod):
@@ -76,33 +77,22 @@ meta_info_dim = 4
 num_repeats= args.num_repeats
 activations = nn.LeakyReLU
 output_activation = nn.Tanh
-# if args.test:
-#     dict_labels=joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
-# else:
-#     dict_labels = joblib.load("raisimGymTorch/data/dexycb_grasptta_train.pkl")
-#     # get the first row of array in dict_labels.
-#     # The structure of dict_labels is {1:{'a']:array, 'b':array}, 2:{'a']:array, 'b':array}}
-#     # here is the code
-#     for key in dict_labels:
-#         for key2 in dict_labels[key]:
-#             dict_labels[key][key2] = dict_labels[key][key2][[0]]
-#
-#
-dict_labels = joblib.load("raisimGymTorch/data/test_acr.pkl")
-for key in dict_labels:
-    #if key!=1:continue
-    for key2 in dict_labels[key]:
-        dict_labels[key][key2] = dict_labels[key][key2][:2]
 
-dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
-#dict_labels=joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
+# dict_labels = joblib.load("raisimGymTorch/data/test_acr.pkl")
+# for key in dict_labels:
+#     #if key!=1:continue
+#     for key2 in dict_labels[key]:
+#         dict_labels[key][key2] = dict_labels[key][key2][:2]
+
+dict_labels = joblib.load("raisimGymTorch/data/dexycb_test_graspgen.pkl")
+
 
 if args.all_objects:
     dict_labels = concat_dict(dict_labels)
     repeated_label = repeat_label(dict_labels, 1)
 else:
     repeated_label = repeat_label(dict_labels[args.obj_id], 1)
-
+control_dir = repeated_label['qpos_reset'][:,:3]-repeated_label['obj_pose_reset'][:,:3]
 num_envs = repeated_label['final_qpos'].shape[0]
 # mesh_path = "../rsc/meshes_simplified/008_pudding_box/mesh_aligned.obj"
 # obj_pcd = get_obj_pcd(mesh_path)
@@ -209,6 +199,32 @@ else:
         wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
         if wait_time > 0.:
             time.sleep(wait_time)
+
+    ################# get relative direction################
+    init_pos = repeated_label['qpos_reset'][:,:3]
+    init_rot = repeated_label['qpos_reset'][:,3:6]
+    r_init_rot = R.from_euler('XYZ', init_rot, degrees=False)
+    # get final direction
+    hand_rot_init = next_obs[:, 3:6]
+    hand_pos_init = next_obs[:, :3]
+    r_hand = R.from_euler('XYZ', hand_rot_init, degrees=False)
+
+    obj_pos_hand = -next_obs[:,264:267]
+    obj_rot_hand = next_obs[:,267:270]
+    r_obj = R.from_euler('XYZ', obj_rot_hand, degrees=False)
+
+    obj_pos_init = r_hand.apply(obj_pos_hand)+hand_pos_init
+    obj_pos_world = r_init_rot.apply(obj_pos_init)+init_pos
+    hand_pos_world = r_init_rot.apply(hand_pos_init)+init_pos
+    rel_dir = hand_pos_world-obj_pos_world
+    ################# get relative direction################
+
+    # compute cosine similarity between rel_dir and control_dir
+    control_dir = control_dir/np.linalg.norm(control_dir,axis=-1,keepdims=True)
+    rel_dir = rel_dir/np.linalg.norm(rel_dir,axis=-1,keepdims=True)
+    cos_sim = (rel_dir*control_dir).sum(axis=-1)
+
+
     obj_idx_stacked = repeated_label['obj_name']
     ### Log quantiative results
     for obj_id in np.unique(obj_idx_stacked):
@@ -242,12 +258,14 @@ else:
         avg_slip = 1-np.array(slips).sum()/slipped_array.shape[0]
         avg_disp =  np.array(disps).mean()*1000
         std_disp =  np.array(disps).std()*1000
+        cos_sim_ = cos_sim[obj_idx_array].mean()
 
         print('----------------------------------------------------')
         print("object: "+str(obj_id))
         print('{:<40} {:>6}'.format("success: ", '{:0.3f}'.format(avg_slip)))
         print('{:<40} {:>6}'.format("disp mean: ", '{:0.3f}'.format(avg_disp)))
         print('{:<40} {:>6}'.format("disp std: ", '{:0.3f}'.format(std_disp)))
+        print('{:<40} {:>6}'.format("cosine similarity: ", '{:0.3f}'.format(cos_sim_)))
         print('----------------------------------------------------\n')
 
         if not all_obj_train:
@@ -276,6 +294,7 @@ else:
         avg_slip = 1-np.array(slips).sum()/slipped_array.shape[0]
         avg_disp =  np.array(disps).mean()*1000
         std_disp =  np.array(disps).std()*1000
+        cos_sim_ = cos_sim.mean()
 
         if len(success_idx) > 0:
             np.save(log_dir+'/success_idxs',success_idx)
@@ -285,6 +304,7 @@ else:
         print('{:<40} {:>6}'.format("total success rate: ", '{:0.3f}'.format(avg_slip)))
         print('{:<40} {:>6}'.format("disp mean: ", '{:0.3f}'.format(avg_disp)))
         print('{:<40} {:>6}'.format("disp std: ", '{:0.3f}'.format(std_disp)))
+        print('{:<40} {:>6}'.format("cosine similarity: ", '{:0.3f}'.format(cos_sim_)))
         print('----------------------------------------------------\n')
 
 

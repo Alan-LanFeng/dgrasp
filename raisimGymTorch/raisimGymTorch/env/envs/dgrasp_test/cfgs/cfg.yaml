@@ -6,7 +6,7 @@ environment:
   get_pcd: True
   metainfo_dim: 4
   extra_dim: 301
-  render: True
+  render: False
   num_envs: 21
   num_repeats: 1
   eval_every_n: 200
