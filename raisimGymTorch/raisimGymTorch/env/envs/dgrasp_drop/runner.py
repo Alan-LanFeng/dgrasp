@@ -59,11 +59,11 @@ if cfg['module'] == 'MLP':
     cfg['environment']['get_pcd'] = False
     cfg['environment']['extra_dim'] = 1
 elif cfg['module'] == 'mcg':
-    mod = ppo_module.mcg_pcd
+    mod = ppo_module.MLP
     cfg['environment']['get_pcd'] = True
-    cfg['environment']['extra_dim'] = 301
-
-wandb.init(project='dgrasp',config=cfg,name = args.exp_name)
+    cfg['environment']['extra_dim'] = 257
+if args.exp_name != 'test':
+    wandb.init(project='dgrasp',config=cfg,name = args.exp_name)
 
 cfg['seed']=args.seed
 
@@ -73,7 +73,7 @@ trail_steps = cfg['environment']['trail_steps']
 reward_clip = cfg['environment']['reward_clip']
 
 
-dict_labels=joblib.load("raisimGymTorch/data/dexycb_train_graspgen.pkl")
+dict_labels=joblib.load("raisimGymTorch/data/baseline.pkl")
 
 for key in dict_labels:
     #if key!=1:continue

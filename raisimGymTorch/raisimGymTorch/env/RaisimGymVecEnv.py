@@ -10,7 +10,8 @@ from scipy.spatial.transform import Rotation as R
 from raisimGymTorch.helper.utils import dgrasp_to_mano,show_pointcloud_objhand,IDX_TO_OBJ
 import torch
 from manopth.manolayer import ManoLayer
-
+from raisimGymTorch.helper.utils import IDX_TO_OBJ, get_obj_pcd
+from raisimGymTorch.algo.ppo.module import PointNetAutoEncoder
 
 class RaisimGymVecEnv:
 
@@ -19,6 +20,9 @@ class RaisimGymVecEnv:
                  obj_pcd=None):
         if platform.system() == "Darwin":
             os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+
+        model = PointNetAutoEncoder.load_from_checkpoint(
+            'raisimGymTorch/data_all/pointnet_ae.ckpt')
 
         self.normalize_ob = normalize_ob
         self.normalize_rew = normalize_rew
@@ -51,6 +55,19 @@ class RaisimGymVecEnv:
         mean_pca = torch.einsum('bi,ij->bj', [mean_axisang, torch.inverse(mano_layer.th_comps)])
 
         self.mean_pca = mean_pca.numpy()
+
+        if self.get_pcd:
+            self.obj_pcd = np.zeros([self.num_envs,3000,3])
+            for obj_name in np.unique(label['obj_name']):
+
+                obj_pcd = get_obj_pcd(
+                    f'../rsc/meshes_simplified/{obj_name}/textured_simple.obj',num_p=3000)
+                obj_num = np.sum(label['obj_name']==obj_name)
+                obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], obj_num, 0)
+                idx = np.where(label['obj_name']==obj_name)[0]
+                self.obj_pcd[idx] = obj_pcd
+            inp = torch.tensor(self.obj_pcd).float().permute(0, 2, 1)
+            self.obj_embed = model.encoder(inp).cpu().detach().numpy()
 
 
     def move_to_first(self,i):
@@ -135,29 +152,29 @@ class RaisimGymVecEnv:
 
 
         if self.get_pcd:
-            obj_pcd = self.obj_pcd
-            env_num, pcd_num, dim = obj_pcd.shape
+            # obj_pcd = self.obj_pcd
+            # env_num, pcd_num, dim = obj_pcd.shape
+            #
+            # obj_pos = copy.copy(self._observation[:, -15:-12])
+            # obj_euler = copy.copy(self._observation[:, -12:-9])
+            # hand_pos = copy.copy(self._observation[:, :3])
+            # hand_rot = copy.copy(self._observation[:, 3:6])
+            #
+            # r_obj = obj_euler[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
+            # obj_pos = obj_pos[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
+            # r_obj = R.from_euler('XYZ', r_obj, degrees=False)
+            #
+            # obj_pcd = r_obj.apply(obj_pcd.reshape(-1, dim)) - obj_pos
+            # #obj_pcd = obj_pcd.reshape(env_num, -1).astype('float32')
+            #
+            # r_hand = hand_rot[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
+            # hand_pos = hand_pos[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
+            # r_hand = R.from_euler('XYZ', r_hand, degrees=False)
+            #
+            # obj_pcd = r_hand.apply(obj_pcd.reshape(-1, dim)) + hand_pos
+            # obj_pcd = obj_pcd.reshape(env_num, -1).astype('float32')
 
-            obj_pos = copy.copy(self._observation[:, -15:-12])
-            obj_euler = copy.copy(self._observation[:, -12:-9])
-            hand_pos = copy.copy(self._observation[:, :3])
-            hand_rot = copy.copy(self._observation[:, 3:6])
-
-            r_obj = obj_euler[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
-            obj_pos = obj_pos[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
-            r_obj = R.from_euler('XYZ', r_obj, degrees=False)
-
-            obj_pcd = r_obj.apply(obj_pcd.reshape(-1, dim)) - obj_pos
-            #obj_pcd = obj_pcd.reshape(env_num, -1).astype('float32')
-
-            r_hand = hand_rot[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
-            hand_pos = hand_pos[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
-            r_hand = R.from_euler('XYZ', r_hand, degrees=False)
-
-            obj_pcd = r_hand.apply(obj_pcd.reshape(-1, dim)) + hand_pos
-            obj_pcd = obj_pcd.reshape(env_num, -1).astype('float32')
-
-            obs = np.concatenate([obs, obj_pcd], axis=-1)
+            obs = np.concatenate([obs, self.obj_embed], axis=-1)
 
             #
             # if self.time_step%50==0:

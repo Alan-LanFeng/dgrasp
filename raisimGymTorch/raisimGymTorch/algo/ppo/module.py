@@ -5,6 +5,7 @@ import torch.nn.parallel
 import torch.utils.data
 import numpy as np
 import torch.nn.functional as F
+from pytorch_lightning.core.lightning import LightningModule
 
 class Actor:
     def __init__(self, architecture, distribution, device='cpu'):
@@ -315,6 +316,65 @@ class MCG_block(nn.Module):
         return inp,context
 
 
+class PointNetEncoder(nn.Module):
+    def __init__(self):
+        super(PointNetEncoder, self).__init__()
+        self.conv1 = torch.nn.Conv1d(3, 64, 1)
+        self.conv2 = torch.nn.Conv1d(64, 128, 1)
+        self.conv3 = torch.nn.Conv1d(128, 256, 1)
+        self.fc = nn.Linear(256, 256)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        x = self.relu(self.conv1(x))
+        x = self.relu(self.conv2(x))
+        x = self.relu(self.conv3(x))
+        x = torch.max(x, 2, keepdim=True)[0]
+        x = x.view(-1, 256)
+        return self.fc(x)
+
+
+class PointNetDecoder(nn.Module):
+    def __init__(self):
+        super(PointNetDecoder, self).__init__()
+        self.fc1 = nn.Linear(256, 256)
+        self.fc2 = nn.Linear(256, 512)
+        self.fc3 = nn.Linear(512, 1024*3)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        x = self.relu(self.fc1(x))
+        x = self.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x.view(-1, 1024, 3)
+
+class PointNetAutoEncoder(LightningModule):
+    def __init__(self):
+        super().__init__()
+        self.encoder = PointNetEncoder()
+        self.decoder = PointNetDecoder()
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x
+
+    def training_step(self, batch, batch_idx):
+        x = batch['obj_pc']
+        x = x.transpose(2, 1)
+        z = self.encoder(x)
+        x_hat = self.decoder(z)
+        x= x.transpose(2, 1)
+        loss = self.chamfer_distance(x, x_hat)
+        self.log('train_loss', loss)
+        return loss
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        return optimizer
+
+
+
 class MultivariateGaussianDiagonalCovariance(nn.Module):
     def __init__(self, dim, size, init_std, fast_sampler, seed=0):
         super(MultivariateGaussianDiagonalCovariance, self).__init__()
@@ -350,36 +410,36 @@ class MultivariateGaussianDiagonalCovariance(nn.Module):
         self.std.data = new_std
 
 
-class PointNetEncoder(nn.Module):
-    def __init__(self, hidden_dim=512):
-        super(PointNetEncoder, self).__init__()
-        self.conv1 = torch.nn.Conv1d(3, 32, 1)
-        self.conv2 = torch.nn.Conv1d(32, 64, 1)
-        self.conv3 = torch.nn.Conv1d(64, hidden_dim, 1)
-
-        self.linear = nn.Linear(hidden_dim,hidden_dim)
-        torch.nn.init.orthogonal_(self.linear.weight, gain=np.sqrt(2))
-        # self.layer_norm = nn.LayerNorm(hidden_dim)
-        # self.bn1 = nn.BatchNorm1d(32)
-        # self.bn2 = nn.BatchNorm1d(64)
-        # self.bn3 = nn.BatchNorm1d(hidden_dim)
-        self.hidden_dim = hidden_dim
-
-    def forward(self, x):
-        # x = x.transpose(2,1)
-        # x = F.relu(self.bn1(self.conv1(x)))
-        # x = F.relu(self.bn2(self.conv2(x)))
-        # x = self.bn3(self.conv3(x))
-        # x = torch.max(x, 2, keepdim=True)[0]
-        # x = x.view(-1, self.hidden_dim)
-        # x = self.layer_norm(self.linear(x))
-        x = x.transpose(2,1)
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = self.conv3(x)
-        x = torch.max(x, 2, keepdim=True)[0]
-        x = x.view(-1, self.hidden_dim)
-        return x
+# class PointNetEncoder(nn.Module):
+#     def __init__(self, hidden_dim=512):
+#         super(PointNetEncoder, self).__init__()
+#         self.conv1 = torch.nn.Conv1d(3, 32, 1)
+#         self.conv2 = torch.nn.Conv1d(32, 64, 1)
+#         self.conv3 = torch.nn.Conv1d(64, hidden_dim, 1)
+#
+#         self.linear = nn.Linear(hidden_dim,hidden_dim)
+#         torch.nn.init.orthogonal_(self.linear.weight, gain=np.sqrt(2))
+#         # self.layer_norm = nn.LayerNorm(hidden_dim)
+#         # self.bn1 = nn.BatchNorm1d(32)
+#         # self.bn2 = nn.BatchNorm1d(64)
+#         # self.bn3 = nn.BatchNorm1d(hidden_dim)
+#         self.hidden_dim = hidden_dim
+#
+#     def forward(self, x):
+#         # x = x.transpose(2,1)
+#         # x = F.relu(self.bn1(self.conv1(x)))
+#         # x = F.relu(self.bn2(self.conv2(x)))
+#         # x = self.bn3(self.conv3(x))
+#         # x = torch.max(x, 2, keepdim=True)[0]
+#         # x = x.view(-1, self.hidden_dim)
+#         # x = self.layer_norm(self.linear(x))
+#         x = x.transpose(2,1)
+#         x = F.relu(self.conv1(x))
+#         x = F.relu(self.conv2(x))
+#         x = self.conv3(x)
+#         x = torch.max(x, 2, keepdim=True)[0]
+#         x = x.view(-1, self.hidden_dim)
+#         return x
 
 if __name__ == '__main__':
     points = torch.randn(2, 3, 778)
