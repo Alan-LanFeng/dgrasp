@@ -224,7 +224,7 @@ class RaisimGymVecEnv:
             points = torch.gather(obj_pcd, 1, D.unsqueeze(2).expand(-1, -1, 3))
             #normals = torch.gather(self.obj_normal, 1, D.unsqueeze(2).expand(-1, -1, 3))
 
-            points_and_dist = torch.cat((points, D.unsqueeze(2)), dim=2).reshape(points.shape[0], -1).cpu().detach().numpy()
+            points_and_dist = torch.cat((points, C.unsqueeze(2)), dim=2).reshape(points.shape[0], -1).cpu().detach().numpy()
             joints = joints.reshape(points.shape[0], -1).cpu().detach().numpy()
             add_obs = np.concatenate((joints, points_and_dist,self.obj_embed), axis=1)
             # if self.time_step%50==0:
