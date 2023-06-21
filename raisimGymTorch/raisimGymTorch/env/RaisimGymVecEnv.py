@@ -12,6 +12,7 @@ import torch
 from manopth.manolayer import ManoLayer
 from raisimGymTorch.helper.utils import IDX_TO_OBJ, get_obj_pcd
 from raisimGymTorch.algo.ppo.module import PointNetAutoEncoder
+import trimesh
 
 class RaisimGymVecEnv:
 
@@ -40,14 +41,14 @@ class RaisimGymVecEnv:
         self.time_step = 0
         self.n_steps =  cfg['pre_grasp_steps']+ cfg['trail_steps']
         # if obj_pcd:
-        self.obj_pcd = obj_pcd
+
         label['final_contact_pos'] = np.zeros_like(label['final_contacts'])
         self.load_object(label['obj_name'], label['obj_w_stacked'], label['obj_dim_stacked'],
                          label['obj_type_stacked'])
         self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
                        label['final_contacts'])
         self.get_pcd = cfg['get_pcd']
-
+        self.mano_layer = ManoLayer(mano_root='raisimGymTorch/data', flat_hand_mean=True, ncomps=45, use_pca=False).to('cuda')
         mano_layer = ManoLayer(mano_root='raisimGymTorch/data', flat_hand_mean=False, ncomps=45, use_pca=True)
         mean_axisang = mano_layer.th_hands_mean
         self.th_comps = mano_layer.th_comps.numpy()
@@ -58,17 +59,25 @@ class RaisimGymVecEnv:
 
         if self.get_pcd:
             self.obj_pcd = np.zeros([self.num_envs,3000,3])
+            self.obj_normal = np.zeros([self.num_envs,3000,3])
+            self.obj_mesh = {}
             for obj_name in np.unique(label['obj_name']):
-
-                obj_pcd = get_obj_pcd(
-                    f'../rsc/meshes_simplified/{obj_name}/textured_simple.obj',num_p=3000)
+                p = f'../rsc/meshes_simplified/{obj_name}/textured_simple.obj'
+                #obj_pcd = get_obj_pcd(p,num_p=3000)
+                obj_mesh = trimesh.load_mesh(p)
+                sampled_points, face_id = trimesh.sample.sample_surface(obj_mesh, 3000)
+                sampled_normals = obj_mesh.face_normals[face_id]
                 obj_num = np.sum(label['obj_name']==obj_name)
-                obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], obj_num, 0)
+                obj_pcd = np.repeat(sampled_points[np.newaxis, ...], obj_num, 0)
                 idx = np.where(label['obj_name']==obj_name)[0]
                 self.obj_pcd[idx] = obj_pcd
+                self.obj_normal[idx] = sampled_normals
+                for i in idx:
+                    self.obj_mesh[i] = obj_mesh
+
             inp = torch.tensor(self.obj_pcd).float().permute(0, 2, 1)
             self.obj_embed = model.encoder(inp).cpu().detach().numpy()
-
+            self.obj_pcd = torch.tensor(self.obj_pcd,device='cuda').float()
 
     def move_to_first(self,i):
 
@@ -155,10 +164,10 @@ class RaisimGymVecEnv:
             # obj_pcd = self.obj_pcd
             # env_num, pcd_num, dim = obj_pcd.shape
             #
-            # obj_pos = copy.copy(self._observation[:, -15:-12])
-            # obj_euler = copy.copy(self._observation[:, -12:-9])
-            # hand_pos = copy.copy(self._observation[:, :3])
-            # hand_rot = copy.copy(self._observation[:, 3:6])
+            obj_pos = -copy.copy(self._observation[:, -15:-12])
+            obj_euler = copy.copy(self._observation[:, -12:-9])
+            hand_pos = copy.copy(self._observation[:, :3])
+            hand_euler = copy.copy(self._observation[:, 3:6])
             #
             # r_obj = obj_euler[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
             # obj_pos = obj_pos[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
@@ -174,15 +183,54 @@ class RaisimGymVecEnv:
             # obj_pcd = r_hand.apply(obj_pcd.reshape(-1, dim)) + hand_pos
             # obj_pcd = obj_pcd.reshape(env_num, -1).astype('float32')
 
-            obs = np.concatenate([obs, self.obj_embed], axis=-1)
+            # Convert the Euler angles to rotation matrices
+            hand_rot_mat = R.from_euler('XYZ', hand_euler, degrees=False)
 
-            #
+            # Transform obj_pos from the hand frame to the world frame
+            obj_pos_world = hand_rot_mat.apply(obj_pos) + hand_pos
+
+            # Calculate the position of the hand in the object's frame
+            hand_pos_in_obj_frame = hand_pos - obj_pos_world
+
+            # Transform obj_euler from the hand frame to the world frame
+            obj_rot_mat_hand = R.from_euler('XYZ', obj_euler, degrees=False)
+            obj_rot_mat_world = hand_rot_mat * obj_rot_mat_hand
+
+            # Calculate the rotation matrix for the hand in the object's frame
+            hand_rot_in_obj_frame = obj_rot_mat_world.inv() * hand_rot_mat
+
+            # Convert the rotation matrix back to Euler angles
+            hand_euler_in_obj_frame = hand_rot_in_obj_frame.as_euler('XYZ', degrees=False)
+
+            hand_pos_in_obj_frame = hand_rot_in_obj_frame.apply(hand_pos_in_obj_frame)
+
+            gc = copy.copy(self._observation[:, :51])
+            gc[:, :3] = hand_pos_in_obj_frame
+            gc[:, 3:6] = hand_euler_in_obj_frame
+            mano_param = dgrasp_to_mano(gc)
+            mano_param = torch.from_numpy(mano_param).float().to('cuda')
+
+            verts, joints = self.mano_layer(th_pose_coeffs=mano_param[:, :48], th_trans=mano_param[:, -3:])
+            #hand_face = self.mano_layer.th_faces
+            verts /= 1000
+            joints /= 1000
+            # get nearest point between joints and obj_pcd
+            obj_pcd = self.obj_pcd
+
+            dists = torch.cdist(joints, obj_pcd)
+
+            # Get the minimum distance and index
+            C, D = torch.min(dists, dim=2)
+            points = torch.gather(obj_pcd, 1, D.unsqueeze(2).expand(-1, -1, 3))
+            #normals = torch.gather(self.obj_normal, 1, D.unsqueeze(2).expand(-1, -1, 3))
+
+            points_and_dist = torch.cat((points, D.unsqueeze(2)), dim=2).reshape(points.shape[0], -1).cpu().detach().numpy()
+            joints = joints.reshape(points.shape[0], -1).cpu().detach().numpy()
+            add_obs = np.concatenate((joints, points_and_dist,self.obj_embed), axis=1)
             # if self.time_step%50==0:
-            #     idx =11
-            #     gc = copy.copy(self._observation[idx,:51])
-            #     verts,joints = dgrasp_to_mano(gc)
-            #     show_pointcloud_objhand(verts,obj_pcd[idx].reshape(-1,3))
-
+            #     show_pointcloud_objhand(verts[0], self.obj_pcd[0].reshape(-1, 3))
+            #obs = np.concatenate([obs, self.obj_embed], axis=-1)
+            obs = np.concatenate([obs, add_obs], axis=-1)
 
         info = {}
         info['meta_info'] = meta_info

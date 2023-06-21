@@ -61,7 +61,7 @@ if cfg['module'] == 'MLP':
 elif cfg['module'] == 'mcg':
     mod = ppo_module.MLP
     cfg['environment']['get_pcd'] = True
-    cfg['environment']['extra_dim'] = 257
+    cfg['environment']['extra_dim'] = 404
 if args.exp_name != 'test':
     wandb.init(project='dgrasp',config=cfg,name = args.exp_name)
 
@@ -93,13 +93,8 @@ cfg['environment']['num_envs'] = num_envs
 cfg["testing"] = True if args.test else False
 print('num envs', num_envs)
 
-# get obj pcd
-# mesh_path = "../rsc/meshes_simplified/008_pudding_box/mesh_aligned.obj"
-# obj_pcd = get_obj_pcd(mesh_path)
-# obj_pcd = np.repeat(obj_pcd[np.newaxis, ...], num_envs, 0)
-obj_pcd = None
 
-env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'],label=repeated_label,obj_pcd=obj_pcd)
+env = VecEnv(mano.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'],label=repeated_label)
 
 ### Setting dimensions from environments
 ob_dim = env.obsdim_for_agent

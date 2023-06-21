@@ -18,3 +18,4 @@ raisimGymTorch/env/bin/rsg*
 */data_ycb/*
 *event*
 /pretrained_policies/
+*.npy
