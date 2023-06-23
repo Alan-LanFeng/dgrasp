@@ -141,13 +141,18 @@ for update in range(args.num_iterations):
     next_obs,info = env.reset()
     done_array = np.zeros(num_envs)
     reward_array = np.zeros([n_steps, num_envs])
+    reward_info = info['reward_info']
     for step in range(n_steps):
 
         obs = next_obs
         #obs = pe.add(obs,step)
         action = ppo.act(obs)
-        next_obs,reward, dones,info = env.step(action.astype('float32'))
-
+        next_obs,reward, dones,info_ = env.step(action.astype('float32'))
+        rw = info_['reward_info']
+        for i in range(len(reward_info)):
+            r_i = reward_info[i]
+            for k in r_i.keys():
+                r_i[k] = r_i[k] + rw[i][k]
         done_array+=dones
         reward.clip(min=reward_clip)
         ppo.step(value_obs=obs, rews=reward, dones=dones)
@@ -175,10 +180,20 @@ for update in range(args.num_iterations):
     mean_file_name = saver.data_dir + "/rewards.txt"
     np.savetxt(mean_file_name, avg_rewards)
 
-    results = {}
-    results['rewards'] = average_ll_performance
-    results['crush_rate'] = success_rate
-    wandb.log(results)
+    # average all rewards in reward_info by len(reward_info)
+    # first sum over all envs then average over all steps
+    for i in range(len(reward_info)):
+        r_i = reward_info[i]
+        for k in r_i.keys():
+            r_i[k] = r_i[k] / n_steps
+    r_0 = reward_info[0]
+    for k in r_0.keys():
+        for i in range(1,len(reward_info)):
+            r_0[k] = r_0[k] + reward_info[i][k]
+        r_0[k] = r_0[k] / len(reward_info)
+    r_0['crush_rate'] = success_rate
+
+    wandb.log(r_0)
 
     # print('----------------------------------------------------')
     # print('{:>6}th iteration'.format(update))

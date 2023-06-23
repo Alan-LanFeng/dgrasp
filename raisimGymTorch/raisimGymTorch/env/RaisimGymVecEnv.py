@@ -111,10 +111,21 @@ class RaisimGymVecEnv:
 
         obs, info = self.observe()
 
-        reward = self._reward.copy()
-        reward+=self.get_pca_rewards(obs)
+        reward, reward_info = self.get_reward_info(obs)
+
+        info['reward_info'] = reward_info
 
         return obs, reward, self._done.copy(), info
+
+    def get_reward_info(self,obs):
+        pca_reward = self.get_pca_rewards(obs)
+        reward_info = self.wrapper.getRewardInfo()
+        for i in range(len(reward_info)):
+            reward_info[i]['pca'] = pca_reward[i]
+            reward_info[i]['reward_sum'] += reward_info[i]['pca']
+        reward = np.array([r['reward_sum'] for r in reward_info])
+        return reward, reward_info
+
 
     def get_pca_rewards(self, obs):
         bs = obs.shape[0]
@@ -164,7 +175,7 @@ class RaisimGymVecEnv:
             # obj_pcd = self.obj_pcd
             # env_num, pcd_num, dim = obj_pcd.shape
             #
-            obj_pos = -copy.copy(self._observation[:, -15:-12])
+            obj_pos = copy.copy(self._observation[:, -15:-12])
             obj_euler = copy.copy(self._observation[:, -12:-9])
             hand_pos = copy.copy(self._observation[:, :3])
             hand_euler = copy.copy(self._observation[:, 3:6])
@@ -262,6 +273,9 @@ class RaisimGymVecEnv:
             self.reset_state(qpos_reset, np.zeros((num_envs, 51), 'float32'), obj_pose_reset)
 
         obs, info = self.observe()
+
+        reward, reward_info = self.get_reward_info(obs)
+        info['reward_info'] = reward_info
         return obs, info
 
     def load_object(self, obj_idx, obj_weight, obj_dim, obj_type):

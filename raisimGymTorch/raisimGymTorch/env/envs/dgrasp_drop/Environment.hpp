@@ -220,16 +220,16 @@ namespace raisim {
             }
 
             /// For visualization of the motion synthesis, we can also display the target object pose
-            if (visualizable_)
-            {
-                std::string obj_name_target = resourceDir_ + "/meshes_simplified/" + ycb_objects_[obj_idx[0]] + "/textured_meshlab.obj";
-                obj_mesh_2 =  static_cast<raisim::Mesh*>(world_->addMesh(obj_name_target, obj_weight[0], inertia, com, 1.0,"",raisim::COLLISION(10),raisim::COLLISION(10)));
-                obj_mesh_2->setPosition(obj_pos_init_[0],obj_pos_init_[1],obj_pos_init_[2]);
-                obj_mesh_2->setOrientation(1,0,0,0);
-                obj_mesh_2->setVelocity(0,0,0,0,0,0);
-                obj_mesh_2->setAppearance("0 1 0 0.5");
-                obj_mesh_2->setName("mesh_obj_2");
-            }
+//            if (visualizable_)
+//            {
+//                std::string obj_name_target = resourceDir_ + "/meshes_simplified/" + obj_idx + "/textured_meshlab.obj";
+//                obj_mesh_2 =  static_cast<raisim::Mesh*>(world_->addMesh(obj_name_target, obj_weight[0], inertia, com, 1.0,"",raisim::COLLISION(10),raisim::COLLISION(10)));
+//                obj_mesh_2->setPosition(obj_pos_init_[0],obj_pos_init_[1],obj_pos_init_[2]);
+//                obj_mesh_2->setOrientation(1,0,0,0);
+//                obj_mesh_2->setVelocity(0,0,0,0,0,0);
+//                obj_mesh_2->setAppearance("0 1 0 0.5");
+//                obj_mesh_2->setName("mesh_obj_2");
+//            }
 
         }
 
@@ -345,12 +345,12 @@ namespace raisim {
                 obj_mesh_1->setVelocity(0,0,0,0,0,0);
             }
 
-            if (visualizable_)
-            {
-                obj_mesh_2->setPosition(obj_pos_init_[0],obj_pos_init_[1],obj_pos_init_[2]);
-                obj_mesh_2->setOrientation(obj_pos_init_[3],obj_pos_init_[4],obj_pos_init_[5],obj_pos_init_[6]);
-                obj_mesh_2->setVelocity(0,0,0,0,0,0);
-            }
+//            if (visualizable_)
+//            {
+//                obj_mesh_2->setPosition(obj_pos_init_[0],obj_pos_init_[1],obj_pos_init_[2]);
+//                obj_mesh_2->setOrientation(obj_pos_init_[3],obj_pos_init_[4],obj_pos_init_[5],obj_pos_init_[6]);
+//                obj_mesh_2->setVelocity(0,0,0,0,0,0);
+//            }
 
             /// Set action mean to initial pose (first 6DoF since start at 0)
             actionMean_.setZero();
@@ -562,16 +562,16 @@ namespace raisim {
 
             /// Store all rewards
             rewards_.record("pos_reward", std::max(-10.0, pos_reward_));
-            rewards_.record("root_pos_reward_", std::max(-10.0, root_pos_reward_));
-            rewards_.record("root_pose_reward_", std::max(-10.0, root_pose_reward_));
+            //rewards_.record("root_pos_reward_", std::max(-10.0, root_pos_reward_));
+            //rewards_.record("root_pose_reward_", std::max(-10.0, root_pose_reward_));
             rewards_.record("pose_reward", std::max(-10.0, pose_reward_));
             rewards_.record("contact_reward", std::max(-10.0, contact_reward_));
-            rewards_.record("obj_reward", std::max(-10.0, obj_reward_));
+            //rewards_.record("obj_reward", std::max(-10.0, obj_reward_));
             rewards_.record("impulse_reward", std::min(impulse_reward_, obj_weight_*5));
             rewards_.record("rel_obj_reward_", std::max(0.0, rel_obj_reward_));
             rewards_.record("body_vel_reward_", std::max(0.0,body_vel_reward_));
             rewards_.record("body_qvel_reward_", std::max(0.0,body_qvel_reward_));
-            rewards_.record("torque", std::max(0.0, mano_->getGeneralizedForce().squaredNorm()));
+            //rewards_.record("torque", std::max(0.0, mano_->getGeneralizedForce().squaredNorm()));
 
 
             return rewards_.sum()+live_reward;
@@ -587,11 +587,11 @@ namespace raisim {
             rel_contacts_.setZero();
             impulses_.setZero();
 
-            if (visualizable_) {
-                obj_mesh_2->setPosition(final_obj_pos_[0], final_obj_pos_[1], final_obj_pos_[2]);
-                obj_mesh_2->setOrientation(final_obj_pos_[3], final_obj_pos_[4], final_obj_pos_[5], final_obj_pos_[6]);
-                obj_mesh_2->setVelocity(0, 0, 0, 0, 0, 0);
-            }
+//            if (visualizable_) {
+//                obj_mesh_2->setPosition(final_obj_pos_[0], final_obj_pos_[1], final_obj_pos_[2]);
+//                obj_mesh_2->setOrientation(final_obj_pos_[3], final_obj_pos_[4], final_obj_pos_[5], final_obj_pos_[6]);
+//                obj_mesh_2->setVelocity(0, 0, 0, 0, 0, 0);
+//            }
 
             /// Get updated hand state
             mano_->getState(gc_, gv_);
@@ -641,9 +641,9 @@ namespace raisim {
                 if (i==0)
                 {
                     raisim::transpose(Body_orientation, body_orientation_transpose);
-                    rel_objpalm[0] = Position[0]-Obj_Position[0];
-                    rel_objpalm[1] = Position[1]-Obj_Position[1];
-                    rel_objpalm[2] = Position[2]-Obj_Position[2];
+                    rel_objpalm[0] = Obj_Position[0]-Position[0];
+                    rel_objpalm[1] = Obj_Position[1]-Position[1];
+                    rel_objpalm[2] = Obj_Position[2]-Position[2];
 
                     rel_objpalm_pos_ = Body_orientation.e().transpose()*rel_objpalm.e(); // relative position between object and wrist in wrist coordinates
 
@@ -795,24 +795,8 @@ namespace raisim {
                 return true;
             }
 
-           if (time_step == 50)
+           if (time_step == 100)
             {
-                if (cylinder_mesh)
-                {
-                    Obj_Position = cylinder->getPosition();
-                }
-                else if (box_obj_mesh)
-                {
-                    Obj_Position = box_obj->getPosition();
-                }
-                else
-                {
-                    Obj_Position = obj_mesh_1->getPosition();
-                }
-                height_diff = obj_pos_init_[2]-Obj_Position[2];
-                if (height_diff>0.2)
-                {
-
                     box->getPosition(0,table_pos);
                     // print warning
 //                    std::cout << "Warning: Object is falling" << std::endl;
@@ -830,10 +814,9 @@ namespace raisim {
                         box->setPosition(1.25, 0, 0.25);
                         box->setOrientation(1,0,0,0);
                         box->setVelocity(0,0,0,0,0,0);
+                        return true;
                     }
 
-                    return true;
-                }
             }
 
             if (fall){

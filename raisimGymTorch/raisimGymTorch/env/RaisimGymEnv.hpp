@@ -71,7 +71,7 @@ class RaisimGymEnv {
   void startRecordingVideo(const std::string& videoName ) { server_->startRecordingVideo(videoName); }
   void stopRecordingVideo() { server_->stopRecordingVideo(); }
   raisim::Reward& getRewards() { return rewards_; }
-
+  const std::vector<std::map<std::string, float>>& getRewardInfo();
  protected:
   std::unique_ptr<raisim::World> world_;
   double simulation_dt_ = 0.001;
@@ -81,6 +81,9 @@ class RaisimGymEnv {
   int obDim_=0, actionDim_=0;
   std::unique_ptr<raisim::RaisimServer> server_;
   raisim::Reward rewards_;
+  private:
+    std::vector<std::map<std::string, float>> rewardInformation_;
+
 };
 
 }
