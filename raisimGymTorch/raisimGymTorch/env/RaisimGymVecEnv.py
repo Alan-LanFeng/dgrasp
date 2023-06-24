@@ -175,10 +175,10 @@ class RaisimGymVecEnv:
             # obj_pcd = self.obj_pcd
             # env_num, pcd_num, dim = obj_pcd.shape
             #
-            obj_pos = copy.copy(self._observation[:, -15:-12])
-            obj_euler = copy.copy(self._observation[:, -12:-9])
-            hand_pos = copy.copy(self._observation[:, :3])
-            hand_euler = copy.copy(self._observation[:, 3:6])
+            obj_pos = copy.copy(obs[:, 264:267])
+            obj_euler = copy.copy(obs[:, 267:270])
+            hand_pos = copy.copy(obs[:, :3])
+            hand_euler = copy.copy(obs[:, 3:6])
             #
             # r_obj = obj_euler[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
             # obj_pos = obj_pos[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
@@ -215,7 +215,7 @@ class RaisimGymVecEnv:
 
             hand_pos_in_obj_frame = hand_rot_in_obj_frame.apply(hand_pos_in_obj_frame)
 
-            gc = copy.copy(self._observation[:, :51])
+            gc = copy.copy(obs[:, :51])
             gc[:, :3] = hand_pos_in_obj_frame
             gc[:, 3:6] = hand_euler_in_obj_frame
             mano_param = dgrasp_to_mano(gc)
