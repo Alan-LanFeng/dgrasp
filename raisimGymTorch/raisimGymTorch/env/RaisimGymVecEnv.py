@@ -213,22 +213,35 @@ class RaisimGymVecEnv:
         if self.get_pcd:
             obj_pcd = self.obj_pcd.cpu().detach().numpy()
             env_num, pcd_num, dim = obj_pcd.shape
-            #
+
             obj_pos = copy.copy(obs[:, 264:267])
             obj_euler = copy.copy(obs[:, 267:270])
             hand_pos = copy.copy(obs[:, :3])
             hand_euler = copy.copy(obs[:, 3:6])
-            #
-            r_obj = obj_euler[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
-            obj_pos = obj_pos[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
-            r_obj = R.from_euler('XYZ', r_obj, degrees=False)
+            # Convert the Euler angles to rotation matrices
+            hand_rot_mat = R.from_euler('XYZ', hand_euler, degrees=False)
 
-            obj_pcd = r_obj.apply(obj_pcd.reshape(-1, dim)) + obj_pos
-            obj_pcd = obj_pcd.reshape(env_num, pcd_num, dim)
-            obj_pcd = torch.tensor(obj_pcd, device='cuda').float()
+            # Transform obj_pos from the hand frame to the world frame
+            obj_pos_world = hand_rot_mat.apply(obj_pos) + hand_pos
+
+            # Calculate the position of the hand in the object's frame
+            hand_pos_in_obj_frame = hand_pos - obj_pos_world
+
+            # Transform obj_euler from the hand frame to the world frame
+            obj_rot_mat_hand = R.from_euler('XYZ', obj_euler, degrees=False)
+            obj_rot_mat_world = hand_rot_mat * obj_rot_mat_hand
+
+            # Calculate the rotation matrix for the hand in the object's frame
+            hand_rot_in_obj_frame = obj_rot_mat_world.inv() * hand_rot_mat
+
+            # Convert the rotation matrix back to Euler angles
+            hand_euler_in_obj_frame = hand_rot_in_obj_frame.as_euler('XYZ', degrees=False)
+
+            hand_pos_in_obj_frame = hand_rot_in_obj_frame.apply(hand_pos_in_obj_frame)
 
             gc = copy.copy(obs[:, :51])
-            gc[:, :6] = 0
+            gc[:, :3] = hand_pos_in_obj_frame
+            gc[:, 3:6] = hand_euler_in_obj_frame
             mano_param = dgrasp_to_mano(gc)
             mano_param = torch.from_numpy(mano_param).float().to('cuda')
 
@@ -237,75 +250,23 @@ class RaisimGymVecEnv:
             verts /= 1000
             joints /= 1000
             # get nearest point between joints and obj_pcd
-            #show_pointcloud_objhand(verts[0].cpu(), obj_pcd[0].reshape(-1, 3))
-            dists = torch.cdist(joints, obj_pcd)
+            #show_pointcloud_objhand(verts[0].cpu(), self.obj_pcd[0].cpu())
+            dists = torch.cdist(joints, self.obj_pcd)
 
             # Get the minimum distance and index
             C, D = torch.min(dists, dim=2)
-            points = torch.gather(obj_pcd, 1, D.unsqueeze(2).expand(-1, -1, 3))
+            points = torch.gather(self.obj_pcd, 1, D.unsqueeze(2).expand(-1, -1, 3))
+
             vec = points - joints
-            #points_and_dist = torch.cat((vec, C.unsqueeze(2)), dim=2).reshape(points.shape[0],
-            #                                                                     -1).cpu().detach().numpy()
-            vec = vec.reshape(points.shape[0], -1).cpu().detach().numpy()
+
+            r_obj = obj_euler[:, np.newaxis].repeat(vec.shape[1], 1).reshape(-1, dim)
+
+            r_obj = R.from_euler('XYZ', r_obj, degrees=False)
+            vec = r_obj.apply(vec.reshape(-1, dim).cpu())
+
+            vec = vec.reshape(env_num, -1).astype('float32')
+
             obs = np.concatenate([obs, vec], axis=-1)
-            #normals = torch.gather(self.obj_normal, 1, D.unsqueeze(2).expand(-1, -1, 3))
-
-            #
-            # r_hand = hand_rot[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
-            # hand_pos = hand_pos[:, np.newaxis].repeat(pcd_num, 1).reshape(-1, dim)
-            # r_hand = R.from_euler('XYZ', r_hand, degrees=False)
-            #
-            # obj_pcd = r_hand.apply(obj_pcd.reshape(-1, dim)) + hand_pos
-            # obj_pcd = obj_pcd.reshape(env_num, -1).astype('float32')
-
-            # Convert the Euler angles to rotation matrices
-            # hand_rot_mat = R.from_euler('XYZ', hand_euler, degrees=False)
-            #
-            # # Transform obj_pos from the hand frame to the world frame
-            # obj_pos_world = hand_rot_mat.apply(obj_pos) + hand_pos
-            #
-            # # Calculate the position of the hand in the object's frame
-            # hand_pos_in_obj_frame = hand_pos - obj_pos_world
-            #
-            # # Transform obj_euler from the hand frame to the world frame
-            # obj_rot_mat_hand = R.from_euler('XYZ', obj_euler, degrees=False)
-            # obj_rot_mat_world = hand_rot_mat * obj_rot_mat_hand
-            #
-            # # Calculate the rotation matrix for the hand in the object's frame
-            # hand_rot_in_obj_frame = obj_rot_mat_world.inv() * hand_rot_mat
-            #
-            # # Convert the rotation matrix back to Euler angles
-            # hand_euler_in_obj_frame = hand_rot_in_obj_frame.as_euler('XYZ', degrees=False)
-            #
-            # hand_pos_in_obj_frame = hand_rot_in_obj_frame.apply(hand_pos_in_obj_frame)
-            #
-            # gc = copy.copy(obs[:, :51])
-            # gc[:, :3] = hand_pos_in_obj_frame
-            # gc[:, 3:6] = hand_euler_in_obj_frame
-            # mano_param = dgrasp_to_mano(gc)
-            # mano_param = torch.from_numpy(mano_param).float().to('cuda')
-            #
-            # verts, joints = self.mano_layer(th_pose_coeffs=mano_param[:, :48], th_trans=mano_param[:, -3:])
-            # #hand_face = self.mano_layer.th_faces
-            # verts /= 1000
-            # joints /= 1000
-            # # get nearest point between joints and obj_pcd
-            # obj_pcd = self.obj_pcd
-            #
-            # dists = torch.cdist(joints, obj_pcd)
-            #
-            # # Get the minimum distance and index
-            # C, D = torch.min(dists, dim=2)
-            # points = torch.gather(obj_pcd, 1, D.unsqueeze(2).expand(-1, -1, 3))
-            # #normals = torch.gather(self.obj_normal, 1, D.unsqueeze(2).expand(-1, -1, 3))
-            #
-            # points_and_dist = torch.cat((points, C.unsqueeze(2)), dim=2).reshape(points.shape[0], -1).cpu().detach().numpy()
-            # joints = joints.reshape(points.shape[0], -1).cpu().detach().numpy()
-            # add_obs = np.concatenate((joints, points_and_dist), axis=1)
-            # # if self.time_step%50==0:
-            # #     show_pointcloud_objhand(verts[0], self.obj_pcd[0].reshape(-1, 3))
-            # #obs = np.concatenate([obs, self.obj_embed], axis=-1)
-            # obs = np.concatenate([obs, add_obs], axis=-1)
 
         info = {}
         info['meta_info'] = meta_info
