@@ -61,7 +61,7 @@ if cfg['module'] == 'MLP':
 elif cfg['module'] == 'mcg':
     mod = ppo_module.MLP
     cfg['environment']['get_pcd'] = True
-    cfg['environment']['extra_dim'] = 404
+    cfg['environment']['extra_dim'] = 64
 if args.exp_name != 'test':
     wandb.init(project='dgrasp',config=cfg,name = args.exp_name)
 

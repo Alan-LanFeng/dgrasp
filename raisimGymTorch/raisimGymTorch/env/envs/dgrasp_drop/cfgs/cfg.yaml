@@ -35,7 +35,7 @@ environment:
     pos_reward:
       coeff: 2.0
     pose_reward:
-      coeff: 0.1
+      coeff: 0
 #    root_pos_reward_:
 #      coeff: 0.0
 #    root_pose_reward_:
@@ -46,12 +46,12 @@ environment:
       coeff: 1.0
     impulse_reward:
       coeff: 2.0
-#    obj_reward:
-#      coeff: 0.0
+    obj_reward:
+      coeff: 3.0
 #    obj_pose_reward_:
 #      coeff: 0.0
-    falling_reward:
-      coeff: 1.0
+#    falling_reward:
+#      coeff: 1.0
 #    torque:
 #      coeff: -0.0
     rel_obj_reward_:

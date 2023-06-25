@@ -566,7 +566,7 @@ namespace raisim {
             //rewards_.record("root_pose_reward_", std::max(-10.0, root_pose_reward_));
             rewards_.record("pose_reward", std::max(-10.0, pose_reward_));
             rewards_.record("contact_reward", std::max(-10.0, contact_reward_));
-            //rewards_.record("obj_reward", std::max(-10.0, obj_reward_));
+            rewards_.record("obj_reward", std::max(-10.0, obj_reward_));
             rewards_.record("impulse_reward", std::min(impulse_reward_, obj_weight_*5));
             rewards_.record("rel_obj_reward_", std::max(0.0, rel_obj_reward_));
             rewards_.record("body_vel_reward_", std::max(0.0,body_vel_reward_));
