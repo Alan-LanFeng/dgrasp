@@ -61,7 +61,7 @@ if cfg['module'] == 'MLP':
 elif cfg['module'] == 'mcg':
     mod = ppo_module.MLP
     cfg['environment']['get_pcd'] = True
-    cfg['environment']['extra_dim'] = 404
+    cfg['environment']['extra_dim'] = 64
 cfg['seed']=args.seed
 
 ### get experiment parameters
