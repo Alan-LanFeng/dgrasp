@@ -752,7 +752,7 @@ namespace raisim {
 
         /// This function is only relevant for testing
         /// It increases the gain of the root control
-        void set_root_control() final {
+        void set_root_control(const Eigen::Ref<EigenVec>& obj_goal_pos) final {
 
             motion_synthesis = true;
 

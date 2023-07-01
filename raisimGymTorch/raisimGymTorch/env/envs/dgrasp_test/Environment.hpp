@@ -32,6 +32,9 @@ namespace raisim {
             mano_ = world_->addArticulatedSystem(resourceDir+"/mano/"+hand_model,"",{},raisim::COLLISION(0),raisim::COLLISION(0)|raisim::COLLISION(2)|raisim::COLLISION(63));
             mano_->setName("mano");
 
+            mano_2 = world_->addArticulatedSystem(resourceDir+"/mano/"+hand_model,"",{},raisim::COLLISION(0),raisim::COLLISION(0)|raisim::COLLISION(2)|raisim::COLLISION(63));
+            mano_2->setName("mano2");
+
             /// add table
             box = static_cast<raisim::Box*>(world_->addBox(2, 1, 0.5, 100, "", raisim::COLLISION(1)));
             box->setPosition(1.25, 0, 0.25);
@@ -39,15 +42,21 @@ namespace raisim {
 
             /// set PD control mode
             mano_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
-
+            mano_2->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
             /// get actuation dimensions
             gcDim_ = mano_->getGeneralizedCoordinateDim();
             gvDim_ = mano_->getDOF();
+
+
             nJoints_ = gcDim_-3;
 
             gc_.setZero(gcDim_);
             gv_.setZero(gvDim_);
             gc_set_.setZero(gcDim_); gv_set_.setZero(gvDim_);
+
+            gc_2.setZero(gcDim_);
+            gv_2.setZero(gvDim_);
+            gc_set_2.setZero(gcDim_); gv_set_2.setZero(gvDim_);
 
             /// initialize all variables
             pTarget_.setZero(gcDim_); vTarget_.setZero(gvDim_); pTarget6_.setZero(6);
@@ -64,6 +73,18 @@ namespace raisim {
             obj_pose_.setZero(); obj_pos_init_.setZero(7);
             Fpos_world.setZero();
             final_obj_pos_[3] = 1.0;
+
+            //initialize all variables for second hand
+            pTarget_2.setZero(gcDim_); vTarget_2.setZero(gvDim_); pTarget6_2.setZero(6);
+            final_pose_2.setZero(nJoints_), final_obj_pos_2.setZero(7), final_ee_pos_2.setZero(num_bodyparts*3), final_contact_pos_2.setZero(num_contacts*3), final_vertex_normals_2.setZero(num_contacts*3), contact_body_idx_2.setZero(num_contacts), final_contact_array_2.setZero(num_contacts);
+            rel_pose_2.setZero(nJoints_), rel_obj_pos_2.setZero(3), rel_objpalm_pos_2.setZero(3), rel_body_pos_2.setZero(num_bodyparts*3), rel_contact_pos_2.setZero(num_contacts*3),  rel_obj_pose_2.setZero(3), contacts_2.setZero(num_contacts), rel_contacts_2.setZero(num_contacts), impulses_2.setZero(num_contacts);
+            actionMean_2.setZero(actionDim_);  actionStd_2.setOnes(actionDim_);
+            joint_limit_high_2.setZero(actionDim_); joint_limit_low_2.setZero(actionDim_);
+            Position_2.setZero(); Obj_Position_2.setZero(); Rel_fpos_2.setZero();
+            rel_obj_vel_2.setZero(); rel_obj_qvel_2.setZero();
+            bodyLinearVel_2.setZero(); bodyAngularVel_2.setZero();
+            init_root_2.setZero(); init_or_2.setZero(); init_rot_2.setZero();
+            Fpos_world_2.setZero();
 
 
             /// initialize 3D positions weights for fingertips higher than for other fingerparts
@@ -87,9 +108,14 @@ namespace raisim {
             mano_->setGeneralizedForce(Eigen::VectorXd::Zero(gvDim_));
             mano_->setGeneralizedCoordinate(Eigen::VectorXd::Zero(gcDim_));
 
+            mano_2->setPdGains(jointPgain, jointDgain);
+            mano_2->setGeneralizedForce(Eigen::VectorXd::Zero(gvDim_));
+            mano_2->setGeneralizedCoordinate(Eigen::VectorXd::Zero(gcDim_));
+
             /// MUST BE DONE FOR ALL ENVIRONMENTS (CURRENTLY MANUALLY)
             obDim_ =  283;
             obDouble_.setZero(obDim_);
+            obDouble_2.setZero(obDim_);
 
             testing =  cfg["testing"].As<bool>();
             root_guided =  cfg["root_guided"].As<bool>();
@@ -102,6 +128,7 @@ namespace raisim {
             joint_limits_ = mano_->getJointLimits();
             for(int i=0;i < int(gcDim_); i++){
                 actionMean_[i] = (joint_limits_[i][1]+joint_limits_[i][0])/2.0;
+                actionMean_2[i] = (joint_limits_[i][1]+joint_limits_[i][0])/2.0;
                 joint_limit_low[i] = joint_limits_[i][0];
                 joint_limit_high[i] = joint_limits_[i][1];
             }
@@ -173,6 +200,8 @@ namespace raisim {
                 world_->removeObject(box_obj);
             if (world_->getObject("mesh_obj") != NULL)
                 world_->removeObject(obj_mesh_1);
+            if (world_->getObject("mesh_obj_2") != NULL)
+                world_->removeObject(obj_mesh_2);
             /// if obj is a primitive cylinder
             if (obj_type[0] == 0)
             {
@@ -217,6 +246,17 @@ namespace raisim {
                 obj_mesh_1->setVelocity(0,0,0,0,0,0);
                 obj_mesh_1->setName("mesh_obj");
             }
+            std::string obj_name;
+            obj_name = resourceDir_ + "/meshes_simplified/" + obj_idx + "/textured_simple.obj";
+            obj_mesh_2 = static_cast<raisim::Mesh*>(world_->addMesh(obj_name, obj_weight[0], inertia, com, 1.0,"",raisim::COLLISION(10),raisim::COLLISION(10)));
+
+            obj_mesh_2->setPosition(obj_pos_init_[0],obj_pos_init_[1],obj_pos_init_[2]);
+            obj_mesh_2->setOrientation(1,0,0,0);
+            obj_mesh_2->setVelocity(0,0,0,0,0,0);
+            obj_mesh_2->setAppearance("0 1 0 0.5");
+            obj_mesh_2->setBodyType(raisim::BodyType::STATIC);
+            obj_mesh_2->setName("mesh_obj_2");
+
 
         }
 
@@ -232,6 +272,7 @@ namespace raisim {
                 actionMean_.setZero();
                 actionMean_.tail(nJoints_-3) = gc_set_.tail(nJoints_-3);
                 mano_->setState(gc_set_, gv_set_);
+                mano_2->setState(gc_set_, gv_set_);
                 if (cylinder_mesh)
                 {
                     cylinder->setPosition(obj_pos_init_[0],obj_pos_init_[1],obj_pos_init_[2]);
@@ -249,6 +290,12 @@ namespace raisim {
                     obj_mesh_1->setOrientation(obj_pos_init_[3],obj_pos_init_[4],obj_pos_init_[5],obj_pos_init_[6]);
                     obj_mesh_1->setVelocity(0,0,0,0,0,0);
                 }
+            if (visualizable_)
+                {
+                    obj_mesh_2->setPosition(obj_pos_init_[0],obj_pos_init_[1],obj_pos_init_[2]);
+                    obj_mesh_2->setOrientation(obj_pos_init_[3],obj_pos_init_[4],obj_pos_init_[5],obj_pos_init_[6]);
+                    obj_mesh_2->setVelocity(0,0,0,0,0,0);
+                }
 
                 box->clearExternalForcesAndTorques();
                 box->setPosition(1.25, 0, 0.25);
@@ -260,6 +307,7 @@ namespace raisim {
                 Eigen::VectorXd gen_force;
                 gen_force.setZero(gcDim_);
                 mano_->setGeneralizedForce(gen_force);
+                mano_2->setGeneralizedForce(gen_force);
 
             }
 
@@ -331,6 +379,9 @@ namespace raisim {
                 leg2->setPosition(2.2475,0.4875,0.2375);
                 leg3->setPosition(0.2625,-0.4875,0.2375);
                 leg4->setPosition(2.2475,-0.4875,0.2375);
+                obj_mesh_2->setPosition(obj_pos_init_[0],obj_pos_init_[1],obj_pos_init_[2]);
+                obj_mesh_2->setOrientation(obj_pos_init_[3],obj_pos_init_[4],obj_pos_init_[5],obj_pos_init_[6]);
+                obj_mesh_2->setVelocity(0,0,0,0,0,0);
 
                 }
 
@@ -342,6 +393,44 @@ namespace raisim {
             motion_synthesis = false;
             root_guiding_counter_= 0;
             obj_table_contact_ = 0;
+
+            updateObservation();
+        }
+
+        void reset_mano2_state(const Eigen::Ref<EigenVec>& init_state, const Eigen::Ref<EigenVec>& init_vel):
+                    /// reset gains (only required in case for inference)
+            Eigen::VectorXd jointPgain(gvDim_), jointDgain(gvDim_);
+            jointPgain.head(3).setConstant(50);
+            jointDgain.head(3).setConstant(0.1);
+            jointPgain.tail(nJoints_).setConstant(50.0);
+            jointDgain.tail(nJoints_).setConstant(0.2);
+            mano_2->setPdGains(jointPgain, jointDgain);
+
+            Eigen::VectorXd gen_force;
+            gen_force.setZero(gcDim_);
+            mano_2->setGeneralizedForce(gen_force);
+
+
+            /// set initial hand pose (45 DoF) and velocity (45 DoF)
+            gc_set_.head(6).setZero();
+            gc_set_.tail(nJoints_-3) = init_state.tail(nJoints_-3).cast<double>(); //.cast<double>();
+            gv_set_ = init_vel.cast<double>();
+            mano_2->setState(gc_set_, gv_set_);
+
+            /// set initial root position in global frame as origin in new coordinate frame
+            init_root_ = init_state.head(3);
+            mano_2->setBasePos(init_state.head(3));
+
+            /// set initial root orientation in global frame as origin in new coordinate frame
+            raisim::Vec<4> quat;
+            raisim::eulerToQuat(init_state.segment(3,3),quat);
+            raisim::quatToRotMat(quat,init_rot_);
+            raisim::transpose(init_rot_,init_or_);
+            mano_2->setBaseOrientation(init_rot_);
+
+            /// Set action mean to initial pose (first 6DoF since start at 0)
+            actionMean_.setZero();
+            actionMean_.tail(nJoints_-3) = gc_set_.tail(nJoints_-3);
 
             updateObservation();
         }
@@ -415,28 +504,29 @@ namespace raisim {
 
             if (motion_synthesis)
             {
-                raisim::quatToRotMat(final_obj_pos_.tail(4),rotmat_final_obj_pos);
-                raisim::transpose(rotmat_final_obj_pos, rotmat_final_obj_pos_trans);
-                raisim::matvecmul(rotmat_final_obj_pos, final_ee_pos_.head(3), Fpos_world);
-                raisim::vecadd(obj_pos_raisim, Fpos_world); //Obj_Position before
+//                raisim::quatToRotMat(final_obj_pos_.tail(4),rotmat_final_obj_pos);
+//                raisim::transpose(rotmat_final_obj_pos, rotmat_final_obj_pos_trans);
+//                raisim::matvecmul(rotmat_final_obj_pos, final_ee_pos_.head(3), Fpos_world);
+//                raisim::vecadd(obj_pos_raisim, Fpos_world); //Obj_Position before
                 if (visualizable_)
                 {
                     spheres[0]->setPosition(pos_goal.e());
                 }
 
-
-                pos_goal = action.head(3);
-                raisim::vecsub(pos_goal, init_root_, act_pos);
+                //pos_goal = action.head(3);
+                //raisim::vecsub(pos_goal, init_root_, act_pos);
                 raisim::matvecmul(init_or_,obj_pos_raisim,act_or_pose);
 
                 actionMean_.head(3) = (act_or_pose.e())*std::min(1.0,(0.001*root_guiding_counter_));
+                //std::cout << "obj_pos_raisim " << obj_pos_raisim.e() << std::endl;
+                //std::cout << "actionMean_.head(3) " << actionMean_.head(3) << std::endl;
                 actionMean_.head(3)  += gc_.head(3);
 
                 raisim::Mat<3, 3> rotmat_gc, rotmat_gc_trans, rotmat_obj_pose, posegoal_rotmat;
                 raisim::Vec<4> quat_gc, quat_pg, quat_diff;
                 raisim::Vec<3> euler_obj_pose_goal, euler_obj_pose_curr, diff_obj_pose, rot_goal_euler;
-                pose_goal = action.segment(3,3);
-                raisim::eulerToQuat(pose_goal,quat_pg);
+//                pose_goal = action.segment(3,3);
+//                raisim::eulerToQuat(pose_goal,quat_pg);
                 raisim::quatToRotMat(final_obj_pos_.tail(4),rotmat_gc);
                 raisim::matmul(init_or_, rotmat_gc, rotmat_gc_trans);
                 raisim::RotmatToEuler(rotmat_gc_trans, euler_obj_pose_goal);
@@ -760,9 +850,9 @@ namespace raisim {
 
         /// This function is only relevant for testing
         /// It increases the gain of the root control and lowers the table surface
-        void set_root_control() final {
-
-            testing = true;
+        void set_root_control(const Eigen::Ref<EigenVec>& obj_goal_pos) final {
+            final_obj_pos_ = obj_goal_pos.cast<double>();
+            //testing = true;
             motion_synthesis = true;
 
             Eigen::VectorXd jointPgain(gvDim_), jointDgain(gvDim_);
@@ -773,17 +863,22 @@ namespace raisim {
 
             mano_->setPdGains(jointPgain, jointDgain);
 
+            obj_mesh_2->setPosition(final_obj_pos_[0],final_obj_pos_[1],final_obj_pos_[2]);
+            obj_mesh_2->setOrientation(final_obj_pos_[3],final_obj_pos_[4],final_obj_pos_[5],final_obj_pos_[6]);
+            obj_mesh_2->setVelocity(0,0,0,0,0,0);
+            obj_mesh_2->setAppearance("0 1 0 0.5");
+
             /// lower the surface box
-            box->setPosition(1.25,0,0.0);
+            //box->setPosition(1.25,0,0.0);
 
             /// If rendered, also lower the visualized table
-            if (visualizable_) {
-                table_top->setPosition(1.25, 0, 0.225);
-                leg1->setPosition(0.2625, 0.4875, -0.015);
-                leg2->setPosition(2.2475, 0.4875, -0.015);
-                leg3->setPosition(0.2625, -0.4875, -0.015);
-                leg4->setPosition(2.2475, -0.4875, -0.015);
-            }
+//            if (visualizable_) {
+//                table_top->setPosition(1.25, 0, 0.225);
+//                leg1->setPosition(0.2625, 0.4875, -0.015);
+//                leg2->setPosition(2.2475, 0.4875, -0.015);
+//                leg3->setPosition(0.2625, -0.4875, -0.015);
+//                leg4->setPosition(2.2475, -0.4875, -0.015);
+//            }
 
 
             raisim::Vec<3> frame_pos;
@@ -821,8 +916,11 @@ namespace raisim {
         int gcDim_, gvDim_, nJoints_;
         bool visualizable_ = false;
         raisim::ArticulatedSystem* mano_;
+        raisim::ArticulatedSystem* mano_2;
         Eigen::VectorXd gc_, gv_, pTarget_, pTarget6_, vTarget_, gc_set_, gv_set_,  obj_pos_init_;
+        Eigen::VectorXd gc_2,gv_2, pTarget_2, pTarget6_2, vTarget_2, gc_set_2, gv_set_2,  obj_pos_init_2;
         Eigen::VectorXd gen_force_, final_obj_pos_, final_pose_, final_ee_pos_, final_contact_pos_, final_contact_array_, contact_body_idx_, final_vertex_normals_;
+        Eigen::VectorXd gen_force_2, final_obj_pos_2, final_pose_2, final_ee_pos_2, final_contact_pos_2, final_contact_array_2, contact_body_idx_2, final_vertex_normals_2;
         double terminalRewardCoeff_ = -10.;
         double pose_reward_= 0.0;
         double pos_reward_ = 0.0;
@@ -846,7 +944,9 @@ namespace raisim {
         double impulse_reward_ = 0.0;
         double obj_weight_;
         Eigen::VectorXd joint_limit_high, joint_limit_low, actionMean_, actionStd_, obDouble_, rel_pose_, finger_weights_, rel_obj_pos_, rel_objpalm_pos_, rel_body_pos_, rel_contact_pos_, rel_contacts_, contacts_, impulses_, rel_obj_pose_;
+        Eigen::VectorXd joint_limit_high_2, joint_limit_low_2, actionMean_2, actionStd_2, obDouble_2, rel_pose_2, finger_weights_2, rel_obj_pos_2, rel_objpalm_pos_2, rel_body_pos_2, rel_contact_pos_2, rel_contacts_2, contacts_2, impulses_2, rel_obj_pose_2;
         Eigen::Vector3d bodyLinearVel_, bodyAngularVel_, rel_obj_qvel, rel_obj_vel, up_pose, rel_body_table_pos_;
+        Eigen::Vector3d bodyLinearVel_2, bodyAngularVel_2, rel_obj_qvel_2, rel_obj_vel_2, up_pose_2, rel_body_table_pos_2;
         std::set<size_t> footIndices_;
         raisim::Mesh *obj_mesh_1, *obj_mesh_2, *obj_mesh_3, *obj_mesh_4;
         raisim::Cylinder *cylinder;
@@ -857,7 +957,7 @@ namespace raisim {
         int num_contacts = 16;
         int num_bodyparts = 21;
         int obj_table_contact_ = 0;
-        int root_guiding_counter_ = 0;
+        int root_guiding_counter_ = 10;
         int obj_idx_;
         bool root_guided=false;
         bool cylinder_mesh=false;
@@ -869,7 +969,10 @@ namespace raisim {
         bool contact_pruned = false;
         bool motion_synthesis = false;
         raisim::Vec<3> pose_goal, pos_goal, up_vec, up_gen_vec, obj_pose_, Position, Obj_Position, Rel_fpos, Obj_linvel, Obj_qvel, Fpos_world, init_root_;
+        raisim::Vec<3> pose_goal_2, pos_goal_2, up_vec_2, up_gen_vec_2, obj_pose_2, Position_2, Obj_Position_2, Rel_fpos_2, Obj_linvel_2, Obj_qvel_2, Fpos_world_2, init_root_2;
+
         raisim::Mat<3,3> Obj_orientation, Obj_orientation_temp, Body_orientation, init_or_, root_pose_world_, init_rot_;
+        raisim::Mat<3,3> Obj_orientation_2, Obj_orientation_temp_2, Body_orientation_2, init_or_2, root_pose_world_2, init_rot_2;
         raisim::Vec<4> obj_quat;
         std::vector<int> contact_idxs_;
         std::string body_parts_[21] =  {"WRJ0rz",

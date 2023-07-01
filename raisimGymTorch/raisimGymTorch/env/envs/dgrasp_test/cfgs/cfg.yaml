@@ -16,7 +16,7 @@ environment:
   control_dt: 0.03
   max_time: 4.0
   root_guided: True
-  testing: False
+  testing: True
   cylinder_mesh: False
   box_mesh: False
   no_pose_state: False
@@ -28,7 +28,7 @@ environment:
   finger_action_std: 0.015
   rot_action_std: 0.01
   pre_grasp_steps: 60
-  trail_steps: 50
+  trail_steps: 200
   reward_clip: -2.0
   reward:
     pos_reward:

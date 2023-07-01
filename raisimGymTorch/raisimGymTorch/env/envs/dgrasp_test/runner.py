@@ -78,11 +78,15 @@ num_repeats= args.num_repeats
 activations = nn.LeakyReLU
 output_activation = nn.Tanh
 
-dict_labels = joblib.load("raisimGymTorch/data/handover_acr_.pkl")
-# for key in dict_labels:
-#     #if key!=1:continue
-#     for key2 in dict_labels[key]:
-#         dict_labels[key][key2] = dict_labels[key][key2][:2]
+#t = joblib.load("raisimGymTorch/data/motion_eval_dict_easy.pkl")
+
+#dict_labels = joblib.load("raisimGymTorch/data/demo.pkl")
+dict_labels = joblib.load("raisimGymTorch/data/ho_v1.pkl")
+for key in dict_labels:
+    for key2 in dict_labels[key]:
+        dict_labels[key][key2] = dict_labels[key][key2][:10]
+
+
 
 # dict_labels = joblib.load("raisimGymTorch/data/dexycb_test_graspgen.pkl")
 
@@ -148,10 +152,12 @@ if args.vis_evaluate:
 
             action_ll = action_pred.cpu().detach().numpy()
             ### After grasp is established remove surface and test stability
-            if step>grasp_steps:
-                if not set_guide:
-                    env.set_root_control()
-                    set_guide=True
+            if step==grasp_steps:
+
+                env.set_root_control()
+            if step>=grasp_steps:
+                action_ll[:,:6]=0
+
 
             next_obs,reward, dones,info = env.step(action_ll)
 

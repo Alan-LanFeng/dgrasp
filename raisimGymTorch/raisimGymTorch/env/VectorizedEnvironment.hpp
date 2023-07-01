@@ -119,10 +119,10 @@ class VectorizedEnvironment {
       env->close();
   }
 
-  void set_root_control() {
+  void set_root_control(Eigen::Ref<EigenRowMajorMat> &obj_pos) {
         #pragma omp parallel for
               for (int i = 0; i < num_envs_; i++)
-                  environments_[i]->set_root_control();
+                  environments_[i]->set_root_control(obj_pos.row(i));
   }
 
 

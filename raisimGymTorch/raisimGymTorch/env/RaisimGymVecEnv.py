@@ -7,7 +7,7 @@ import platform
 import os
 import copy
 from scipy.spatial.transform import Rotation as R
-from raisimGymTorch.helper.utils import dgrasp_to_mano,show_pointcloud_objhand,IDX_TO_OBJ
+from raisimGymTorch.helper.utils import dgrasp_to_mano,show_pointcloud_objhand,IDX_TO_OBJ,euler_noise_to_quat
 import torch
 from manopth.manolayer import ManoLayer
 
@@ -38,6 +38,7 @@ class RaisimGymVecEnv:
         # if obj_pcd:
         self.obj_pcd = obj_pcd
         label['final_contact_pos'] = np.zeros_like(label['final_contacts'])
+        label['obj_w_stacked']*=1
         self.load_object(label['obj_name'], label['obj_w_stacked'], label['obj_dim_stacked'],
                          label['obj_type_stacked'])
         self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
@@ -178,7 +179,8 @@ class RaisimGymVecEnv:
             return obs, info
 
     def set_root_control(self):
-        self.wrapper.set_root_control()
+
+        self.wrapper.set_root_control(self.label['obj_goal'])
 
     def reset(self, add_noise=True):
         self.time_step = 0
