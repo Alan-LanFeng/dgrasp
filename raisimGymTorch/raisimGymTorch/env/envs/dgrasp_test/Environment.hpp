@@ -209,7 +209,7 @@ namespace raisim {
                     obj_name = resourceDir_ + "/meshes_simplified/" + obj_idx + "/mesh_aligned.obj";
                 /// if mesh is a decimated mesh
                 else
-                    obj_name = resourceDir_ + "/meshes_simplified/" + obj_idx + "/textured_meshlab_quart.obj";
+                    obj_name = resourceDir_ + "/meshes_simplified/" + obj_idx + "/textured_simple.obj";
                 obj_mesh_1 =  static_cast<raisim::Mesh*>(world_->addMesh(obj_name, obj_weight[0], inertia, com, 1.0,"",raisim::COLLISION(2), raisim::COLLISION(0)|raisim::COLLISION(1)|raisim::COLLISION(63)));
                 obj_idx_ = obj_mesh_1->getIndexInWorld();
                 obj_mesh_1->setPosition(obj_pos_init_[0],obj_pos_init_[1],obj_pos_init_[2]);

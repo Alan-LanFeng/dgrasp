@@ -78,13 +78,13 @@ num_repeats= args.num_repeats
 activations = nn.LeakyReLU
 output_activation = nn.Tanh
 
-# dict_labels = joblib.load("raisimGymTorch/data/test_acr.pkl")
+dict_labels = joblib.load("raisimGymTorch/data/handover_acr_.pkl")
 # for key in dict_labels:
 #     #if key!=1:continue
 #     for key2 in dict_labels[key]:
 #         dict_labels[key][key2] = dict_labels[key][key2][:2]
 
-dict_labels = joblib.load("raisimGymTorch/data/dexycb_test_graspgen.pkl")
+# dict_labels = joblib.load("raisimGymTorch/data/dexycb_test_graspgen.pkl")
 
 
 if args.all_objects:
