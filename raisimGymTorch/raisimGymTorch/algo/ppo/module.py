@@ -6,7 +6,7 @@ import torch.utils.data
 import numpy as np
 import torch.nn.functional as F
 from pytorch_lightning.core.lightning import LightningModule
-from raisimGymTorch.helper.utils import compute_rotation_matrix_from_ortho6d,matrix_to_euler_angles
+from raisimGymTorch.helper.utils import robust_compute_rotation_matrix_from_ortho6d,matrix_to_euler_angles
 
 
 class Actor:
@@ -104,7 +104,7 @@ class MLP(nn.Module):
         if self.output_shape[0] == 1:
             return output
         rot6d = output[:,3:9]
-        rot_euler = matrix_to_euler_angles(compute_rotation_matrix_from_ortho6d(rot6d),'XYZ')*0.1
+        rot_euler = matrix_to_euler_angles(robust_compute_rotation_matrix_from_ortho6d(rot6d),'XYZ')*0.1
         out = torch.cat([output[:,:3],rot_euler,output[:,9:]],dim=1)
         return out
 
