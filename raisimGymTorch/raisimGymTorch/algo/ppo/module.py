@@ -6,6 +6,8 @@ import torch.utils.data
 import numpy as np
 import torch.nn.functional as F
 from pytorch_lightning.core.lightning import LightningModule
+from raisimGymTorch.helper.utils import compute_rotation_matrix_from_ortho6d,matrix_to_euler_angles
+
 
 class Actor:
     def __init__(self, architecture, distribution, device='cpu'):
@@ -88,7 +90,8 @@ class MLP(nn.Module):
             modules.append(self.activation_fn())
             scale.append(np.sqrt(2))
 
-        modules.append(nn.Linear(shape[-1], output_size))
+        s = output_size+3 if output_size !=1 else 1
+        modules.append(nn.Linear(shape[-1], s))
 
         self.mlp = nn.Sequential(*modules)
         scale.append(np.sqrt(2))
@@ -97,7 +100,13 @@ class MLP(nn.Module):
         self.input_shape = [input_size]
         self.output_shape = [output_size]
     def forward(self,obs):
-        return self.mlp(obs)
+        output = self.mlp(obs)
+        if self.output_shape[0] == 1:
+            return output
+        rot6d = output[:,3:9]
+        rot_euler = matrix_to_euler_angles(compute_rotation_matrix_from_ortho6d(rot6d),'XYZ')*0.1
+        out = torch.cat([output[:,:3],rot_euler,output[:,9:]],dim=1)
+        return out
 
     @staticmethod
     def init_weights(sequential, scales):
