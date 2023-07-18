@@ -88,11 +88,11 @@ output_activation = nn.Tanh
 #             dict_labels[key][key2] = dict_labels[key][key2][[0]]
 #
 #
-dict_labels = joblib.load("raisimGymTorch/data/hand_over_dgrasp")
-# for key in dict_labels:
-#     #if key!=1:continue
-#     for key2 in dict_labels[key]:
-#         dict_labels[key][key2] = dict_labels[key][key2][-10:]
+dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
+for key in dict_labels:
+    #if key!=1:continue
+    for key2 in dict_labels[key]:
+        dict_labels[key][key2] = dict_labels[key][key2][-10:]
 
 #dict_labels = joblib.load("raisimGymTorch/data/test.pkl")
 #dict_labels=joblib.load("raisimGymTorch/data/dexycb_test_labels.pkl")
@@ -104,7 +104,6 @@ else:
     repeated_label = repeat_label(dict_labels[args.obj_id], 1)
 
 num_envs = repeated_label['final_qpos'].shape[0]
-print("num_envs",num_envs)
 # mesh_path = "../rsc/meshes_simplified/008_pudding_box/mesh_aligned.obj"
 # obj_pcd = get_obj_pcd(mesh_path)
 obj_pcd = None
@@ -211,6 +210,7 @@ else:
         if wait_time > 0.:
             time.sleep(wait_time)
     obj_idx_stacked = repeated_label['obj_idx_stacked']
+    
     ### Log quantiative results
     for obj_id in np.unique(obj_idx_stacked):
         train_obj_id = obj_id + 1

@@ -372,7 +372,7 @@ namespace raisim {
         /// goal_pose: Hand goal pose (48DoF), 3DoF global euler rotation + 45DoF local joint angles
         /// contact_pos: Deprecated (63 DoF)
         /// goal_contacts: Hand parts that should be in contact (16 hand parts)
-        void set_goals(const Eigen::Ref<EigenVec>& obj_goal_pos, const Eigen::Ref<EigenVec>& ee_goal_pos, const Eigen::Ref<EigenVec>& goal_pose, const Eigen::Ref<EigenVec>& contact_pos, const Eigen::Ref<EigenVec>& goal_contacts) final {
+        void set_goals(const Eigen::Ref<EigenVec>& obj_goal_pos, const Eigen::Ref<EigenVec>& ee_goal_pos, const Eigen::Ref<EigenVec>& goal_pose, const Eigen::Ref<EigenVec>& contact_pos, const Eigen::Ref<EigenVec>& goal_contacts, const Eigen::Ref<EigenVec>& obj_6D_pos) final {
 
             raisim::Vec<4> quat_goal_hand_w, quat_goal_hand_r, quat_obj_init;
             raisim::Vec<3> euler_goal_pose;

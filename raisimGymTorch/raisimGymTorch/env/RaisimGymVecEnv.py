@@ -37,10 +37,14 @@ class RaisimGymVecEnv:
         # if obj_pcd:
         self.obj_pcd = obj_pcd
         label['final_contact_pos'] = np.zeros_like(label['final_contacts'])
+        label['target_obj_pos'] = label['final_obj_pos'].copy()
+
+        label['target_obj_pos'][:,2] += 0.2
+
         self.load_object(label['obj_idx_stacked'], label['obj_w_stacked'], label['obj_dim_stacked'],
                          label['obj_type_stacked'])
         self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
-                       label['final_contacts'])
+                       label['final_contacts'], label['target_obj_pos'])
         self.get_pcd = cfg['get_pcd']
 
         mano_layer = ManoLayer(mano_root='raisimGymTorch/data', flat_hand_mean=False, ncomps=45, use_pca=True)
@@ -63,10 +67,10 @@ class RaisimGymVecEnv:
         self.load_object(label['obj_idx_stacked'], label['obj_w_stacked'], label['obj_dim_stacked'],
                          label['obj_type_stacked'])
         self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
-                       label['final_contacts'])
+                       label['final_contacts'], label['target_obj_pos'])
 
-    def set_goals(self, obj_pos, ee_pos, pose, contact_pos, normals):
-        self.wrapper.set_goals(obj_pos, ee_pos, pose, contact_pos, normals)
+    def set_goals(self, obj_pos, ee_pos, pose, contact_pos, normals, obj_6D_pos):
+        self.wrapper.set_goals(obj_pos, ee_pos, pose, contact_pos, normals, obj_6D_pos)
 
     def seed(self, seed=None):
         self.wrapper.setSeed(seed)
@@ -86,7 +90,8 @@ class RaisimGymVecEnv:
     def step(self, action):
         self.time_step+=1
         self.wrapper.step(action, self._reward, self._done)
-
+        import pdb
+        #pdb.set_trace()
         obs, info = self.observe()
 
         reward = self._reward.copy()
@@ -210,8 +215,8 @@ class RaisimGymVecEnv:
 
         self.wrapper.reset_state(init_state, init_vel, obj_pose)
 
-    def set_goals(self, obj_pos, ee_pos, pose, contact_pos, normals):
-        self.wrapper.set_goals(obj_pos, ee_pos, pose, contact_pos, normals)
+    def set_goals(self, obj_pos, ee_pos, pose, contact_pos, normals, obj_6D_pos):
+        self.wrapper.set_goals(obj_pos, ee_pos, pose, contact_pos, normals, obj_6D_pos)
 
     def _normalize_observation(self, obs):
         if self.normalize_ob:
