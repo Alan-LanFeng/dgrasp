@@ -77,30 +77,34 @@ class VectorizedEnvironment {
             environments_[i]->load_object(obj_idx[i], obj_weight.row(i), obj_dim.row(i), obj_type.row(i));
     }
 
-  void reset_state(Eigen::Ref<EigenRowMajorMat> &init_state, Eigen::Ref<EigenRowMajorMat> &init_vel, Eigen::Ref<EigenRowMajorMat> &obj_pose) {
+  void reset_state(Eigen::Ref<EigenRowMajorMat> &init_state, Eigen::Ref<EigenRowMajorMat> &init_vel, Eigen::Ref<EigenRowMajorMat> &obj_pose, Eigen::Ref<EigenRowMajorMat> &init_state2, Eigen::Ref<EigenRowMajorMat> &init_vel2) {
 #pragma omp parallel for
       for (int i = 0; i < num_envs_; i++)
-          environments_[i]->reset_state(init_state.row(i), init_vel.row(i), obj_pose.row(i));
+          environments_[i]->reset_state(init_state.row(i), init_vel.row(i), obj_pose.row(i),init_state2.row(i), init_vel2.row(i));
   }
 
-    void set_goals(Eigen::Ref<EigenRowMajorMat> &obj_pos, Eigen::Ref<EigenRowMajorMat> &ee_pos, Eigen::Ref<EigenRowMajorMat> &pose, Eigen::Ref<EigenRowMajorMat> &contact_pos, Eigen::Ref<EigenRowMajorMat> &vertex_normals) {
+
+    void set_goals(Eigen::Ref<EigenRowMajorMat> &obj_pos, Eigen::Ref<EigenRowMajorMat> &ee_pos, Eigen::Ref<EigenRowMajorMat> &pose, Eigen::Ref<EigenRowMajorMat> &contact,Eigen::Ref<EigenRowMajorMat> &ee_pos2, Eigen::Ref<EigenRowMajorMat> &pose2, Eigen::Ref<EigenRowMajorMat> &contact2) {
 #pragma omp parallel for
         for (int i = 0; i < num_envs_; i++)
-            environments_[i]->set_goals(obj_pos.row(i), ee_pos.row(i), pose.row(i), contact_pos.row(i), vertex_normals.row(i));
+            environments_[i]->set_goals(obj_pos.row(i), ee_pos.row(i), pose.row(i), contact.row(i),ee_pos2.row(i), pose2.row(i), contact2.row(i));
     }
 
-  void observe(Eigen::Ref<EigenRowMajorMat> &ob) {
+  void observe(Eigen::Ref<EigenRowMajorMat> &ob,Eigen::Ref<EigenRowMajorMat> &ob2) {
 #pragma omp parallel for
     for (int i = 0; i < num_envs_; i++)
-      environments_[i]->observe(ob.row(i));
+      environments_[i]->observe(ob.row(i),ob2.row(i));
   }
 
   void step(Eigen::Ref<EigenRowMajorMat> &action,
             Eigen::Ref<EigenVec> &reward,
-            Eigen::Ref<EigenBoolVec> &done) {
+            Eigen::Ref<EigenBoolVec> &done,
+            Eigen::Ref<EigenRowMajorMat> &action2,
+            Eigen::Ref<EigenVec> &reward2,
+            Eigen::Ref<EigenBoolVec> &done2) {
 #pragma omp parallel for
     for (int i = 0; i < num_envs_; i++)
-      perAgentStep(i, action, reward, done);
+      perAgentStep(i, action, reward, done,action2,reward2,done2);
   }
 
   void turnOnVisualization() { if(render_) environments_[0]->turnOnVisualization(); }
@@ -123,6 +127,12 @@ class VectorizedEnvironment {
         #pragma omp parallel for
               for (int i = 0; i < num_envs_; i++)
                   environments_[i]->set_root_control(obj_pos.row(i));
+  }
+
+  void set_root_control2(Eigen::Ref<EigenRowMajorMat> &obj_pos) {
+        #pragma omp parallel for
+              for (int i = 0; i < num_envs_; i++)
+                  environments_[i]->set_root_control2(obj_pos.row(i));
   }
 
 
@@ -160,9 +170,12 @@ class VectorizedEnvironment {
   inline void perAgentStep(int agentId,
                            Eigen::Ref<EigenRowMajorMat> &action,
                            Eigen::Ref<EigenVec> &reward,
-                           Eigen::Ref<EigenBoolVec> &done) {
+                           Eigen::Ref<EigenBoolVec> &done,
+                           Eigen::Ref<EigenRowMajorMat> &action2,
+                            Eigen::Ref<EigenVec> &reward2,
+                            Eigen::Ref<EigenBoolVec> &done2) {
 //    std::cout << "action i" << agentId << " " << action.row(agentId)[0] << " " <<  action.row(agentId)[1] << " " << action.row(agentId)[2] << std::endl;
-    reward[agentId] = environments_[agentId]->step(action.row(agentId));
+    reward[agentId] = environments_[agentId]->step(action.row(agentId),action2.row(agentId));
 
     rewardInformation_[agentId] = environments_[agentId]->getRewards().getStdMap();
 

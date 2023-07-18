@@ -44,11 +44,12 @@ class RaisimGymEnv {
   virtual void init() = 0;
   virtual void reset() = 0;
 
-  virtual void reset_state(const Eigen::Ref<EigenVec>& init_state, const Eigen::Ref<EigenVec>& init_vel,  const Eigen::Ref<EigenVec>& obj_pose) = 0;
-  virtual void set_goals(const Eigen::Ref<EigenVec>& obj_pos, const Eigen::Ref<EigenVec>& ee_pos, const Eigen::Ref<EigenVec>& pose, const Eigen::Ref<EigenVec>& contact_pos, const Eigen::Ref<EigenVec>& vertex_normals) = 0;
-  virtual void observe(Eigen::Ref<EigenVec> ob) = 0;
+  virtual void reset_state(const Eigen::Ref<EigenVec>& init_state, const Eigen::Ref<EigenVec>& init_vel,  const Eigen::Ref<EigenVec>& obj_pose,const Eigen::Ref<EigenVec>& init_state2, const Eigen::Ref<EigenVec>& init_vel2) = 0;
+  virtual void set_goals(const Eigen::Ref<EigenVec>& obj_goal_pos, const Eigen::Ref<EigenVec>& ee_goal_pos, const Eigen::Ref<EigenVec>& goal_pose, const Eigen::Ref<EigenVec>& goal_contacts,const Eigen::Ref<EigenVec>& ee_goal_pos2, const Eigen::Ref<EigenVec>& goal_pose2, const Eigen::Ref<EigenVec>& goal_contacts2) = 0;
+  virtual void observe(Eigen::Ref<EigenVec> ob,Eigen::Ref<EigenVec> ob2) = 0;
   virtual void set_root_control(const Eigen::Ref<EigenVec>& obj_pos) = 0;
-  virtual float step(const Eigen::Ref<EigenVec>& action) = 0;
+  virtual void set_root_control2(const Eigen::Ref<EigenVec>& obj_pos) = 0;
+  virtual float step(const Eigen::Ref<EigenVec>& action,const Eigen::Ref<EigenVec>& action2) = 0;
   virtual bool isTerminalState(float& terminalReward) = 0;
   ////////////////////////////////////////
 

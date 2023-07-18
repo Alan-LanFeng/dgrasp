@@ -28,9 +28,13 @@ class RaisimGymVecEnv:
         self.meta_dim = cfg['metainfo_dim']
         self.num_acts = self.wrapper.getActionDim()
         self._observation = np.zeros([self.num_envs, self.wrapper.getObDim()], dtype=np.float32)
+        self._observation2 = np.zeros([self.num_envs, self.wrapper.getObDim()], dtype=np.float32)
         self.obs_rms = RunningMeanStd(shape=[self.num_envs, self.obsdim_for_agent])
         self._reward = np.zeros(self.num_envs, dtype=np.float32)
         self._done = np.zeros(self.num_envs, dtype=bool)
+        self._reward2 = np.zeros(self.num_envs, dtype=np.float32)
+        self._done2 = np.zeros(self.num_envs, dtype=bool)
+
         self.rewards = [[] for _ in range(self.num_envs)]
         self.label = label
         self.time_step = 0
@@ -41,8 +45,7 @@ class RaisimGymVecEnv:
         label['obj_w_stacked']*=1
         self.load_object(label['obj_name'], label['obj_w_stacked'], label['obj_dim_stacked'],
                          label['obj_type_stacked'])
-        self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
-                       label['final_contacts'])
+        self.set_goals()
         self.get_pcd = cfg['get_pcd']
 
         mano_layer = ManoLayer(mano_root='raisimGymTorch/data', flat_hand_mean=False, ncomps=45, use_pca=True)
@@ -62,8 +65,7 @@ class RaisimGymVecEnv:
         label = self.label
         self.load_object(label['obj_name'], label['obj_w_stacked'], label['obj_dim_stacked'],
                          label['obj_type_stacked'])
-        self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
-                       label['final_contacts'])
+        self.set_goals()
 
     def seed(self, seed=None):
         self.wrapper.setSeed(seed)
@@ -80,16 +82,16 @@ class RaisimGymVecEnv:
     def stop_video_recording(self):
         self.wrapper.stopRecordingVideo()
 
-    def step(self, action):
+    def step(self, action,action2):
         self.time_step+=1
-        self.wrapper.step(action, self._reward, self._done)
+        self.wrapper.step(action, self._reward, self._done, action2,self._reward2, self._done2)
 
-        obs, info = self.observe()
+        obs,obs2, info = self.observe()
 
         reward = self._reward.copy()
         reward+=self.get_pca_rewards(obs)
 
-        return obs, reward, self._done.copy(), info
+        return obs,obs2, reward, self._done.copy(), info
 
     def get_pca_rewards(self, obs):
         bs = obs.shape[0]
@@ -121,19 +123,18 @@ class RaisimGymVecEnv:
 
     def observe(self, update_mean=True):
         #ret_obs = {}
-        self.wrapper.observe(self._observation)
+        self.wrapper.observe(self._observation,self._observation2)
+
         ob_dim = self._observation.shape[-1]
         meta_info = self._observation[:,ob_dim-self.meta_dim:].copy()
         obs = self._observation[:,:ob_dim-self.meta_dim].copy()
-
-        # ret_obs['hand_obs'] = obs[:,:121]
-        # ret_obs['label_obs'] = obs[:,121:264]
-        # ret_obs['obj_info'] = obs[:,264:]
-
         step_obs = np.zeros([self._observation.shape[0],1]).astype('float32')
         step_obs[:] = self.time_step/self.n_steps
         obs = np.concatenate([obs,step_obs],axis=1)
 
+        meta_info2 = self._observation2[:,ob_dim-self.meta_dim:].copy()
+        obs2 = self._observation2[:,:ob_dim-self.meta_dim].copy()
+        obs2 = np.concatenate([obs2,step_obs],axis=1)
 
         if self.get_pcd:
             obj_pcd = self.obj_pcd
@@ -170,17 +171,16 @@ class RaisimGymVecEnv:
 
         info = {}
         info['meta_info'] = meta_info
-        if self.normalize_ob:
-            if update_mean:
-                self.obs_rms.update(self._observation)
+        info['meta_info2'] = meta_info2
 
-            return self._normalize_observation(self._observation)
-        else:
-            return obs, info
+        return obs, obs2, info
 
     def set_root_control(self):
-
         self.wrapper.set_root_control(self.label['obj_goal'])
+
+
+    def set_root_control2(self):
+        self.wrapper.set_root_control2(self.label['obj_goal2'])
 
     def reset(self, add_noise=True):
         self.time_step = 0
@@ -196,10 +196,10 @@ class RaisimGymVecEnv:
             ### Run episode rollouts
             self.reset_state(qpos_noisy_reset, np.zeros((num_envs, 51), 'float32'), obj_pose_reset)
         else:
-            self.reset_state(qpos_reset, np.zeros((num_envs, 51), 'float32'), obj_pose_reset)
+            self.reset_state(qpos_reset, np.zeros((num_envs, 51), 'float32'), obj_pose_reset, self.label['qpos_reset_2'],np.zeros((num_envs, 51), 'float32'))
 
-        obs, info = self.observe()
-        return obs, info
+        obs,obs2, info = self.observe()
+        return obs,obs2, info
 
     def load_object(self, obj_idx, obj_weight, obj_dim, obj_type):
         #obj_idx = [IDX_TO_OBJ[obj_id+1][0] for obj_id in obj_idx]
@@ -207,12 +207,13 @@ class RaisimGymVecEnv:
         obj_type = obj_type.astype('int32')
         self.wrapper.load_object(obj_idx, obj_weight, obj_dim, obj_type)
 
-    def reset_state(self, init_state, init_vel, obj_pose):
+    def reset_state(self, init_state, init_vel, obj_pose,init_state2, init_vel2):
 
-        self.wrapper.reset_state(init_state, init_vel, obj_pose)
+        self.wrapper.reset_state(init_state, init_vel, obj_pose,init_state2, init_vel2)
 
-    def set_goals(self, obj_pos, ee_pos, pose, contact_pos, normals):
-        self.wrapper.set_goals(obj_pos, ee_pos, pose, contact_pos, normals)
+    def set_goals(self):
+        label = self.label
+        self.wrapper.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contacts'],label['final_ee_2'], label['final_pose_2'], label['final_contacts_2'])
 
     def _normalize_observation(self, obs):
         if self.normalize_ob:

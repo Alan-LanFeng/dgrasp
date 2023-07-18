@@ -80,7 +80,7 @@ namespace raisim {
             rel_pose_2.setZero(nJoints_), rel_obj_pos_2.setZero(3), rel_objpalm_pos_2.setZero(3), rel_body_pos_2.setZero(num_bodyparts*3), rel_contact_pos_2.setZero(num_contacts*3),  rel_obj_pose_2.setZero(3), contacts_2.setZero(num_contacts), rel_contacts_2.setZero(num_contacts), impulses_2.setZero(num_contacts);
             actionMean_2.setZero(actionDim_);  actionStd_2.setOnes(actionDim_);
             joint_limit_high_2.setZero(actionDim_); joint_limit_low_2.setZero(actionDim_);
-            Position_2.setZero(); Obj_Position_2.setZero(); Rel_fpos_2.setZero();
+            Position2.setZero(); Obj_Position_2.setZero(); Rel_fpos_2.setZero();
             rel_obj_vel_2.setZero(); rel_obj_qvel_2.setZero();
             bodyLinearVel_2.setZero(); bodyAngularVel_2.setZero();
             init_root_2.setZero(); init_or_2.setZero(); init_rot_2.setZero();
@@ -262,7 +262,7 @@ namespace raisim {
 
         /// Resets the object and hand to its initial pose
         void reset() final {
-
+            epoch_step = 0;
             if (first_reset_)
             {
                 first_reset_=false;
@@ -271,6 +271,8 @@ namespace raisim {
                 /// all settings to initial state configuration
                 actionMean_.setZero();
                 actionMean_.tail(nJoints_-3) = gc_set_.tail(nJoints_-3);
+                actionMean_2.setZero();
+                actionMean_2.tail(nJoints_-3) = gc_set_.tail(nJoints_-3);
                 mano_->setState(gc_set_, gv_set_);
                 mano_2->setState(gc_set_, gv_set_);
                 if (cylinder_mesh)
@@ -314,8 +316,8 @@ namespace raisim {
         }
 
         /// Resets the state to a user defined input
-        void reset_state(const Eigen::Ref<EigenVec>& init_state, const Eigen::Ref<EigenVec>& init_vel, const Eigen::Ref<EigenVec>& obj_pose) final {
-
+        void reset_state(const Eigen::Ref<EigenVec>& init_state, const Eigen::Ref<EigenVec>& init_vel, const Eigen::Ref<EigenVec>& obj_pose,const Eigen::Ref<EigenVec>& init_state2, const Eigen::Ref<EigenVec>& init_vel2) final {
+            epoch_step=0;
             /// reset gains (only required in case for inference)
             Eigen::VectorXd jointPgain(gvDim_), jointDgain(gvDim_);
             jointPgain.head(3).setConstant(50);
@@ -323,10 +325,12 @@ namespace raisim {
             jointPgain.tail(nJoints_).setConstant(50.0);
             jointDgain.tail(nJoints_).setConstant(0.2);
             mano_->setPdGains(jointPgain, jointDgain);
+            mano_2->setPdGains(jointPgain, jointDgain);
 
             Eigen::VectorXd gen_force;
             gen_force.setZero(gcDim_);
             mano_->setGeneralizedForce(gen_force);
+            mano_2->setGeneralizedForce(gen_force);
 
             /// reset box position (only required in case for inference)
             box->setPosition(1.25, 0, 0.25);
@@ -339,9 +343,17 @@ namespace raisim {
             gv_set_ = init_vel.cast<double>();
             mano_->setState(gc_set_, gv_set_);
 
+            gc_set_2.head(6).setZero();
+            gc_set_2.tail(nJoints_-3) = init_state2.tail(nJoints_-3).cast<double>(); //.cast<double>();
+            gv_set_2 = init_vel2.cast<double>();
+            mano_2->setState(gc_set_2, gv_set_2);
+
             /// set initial root position in global frame as origin in new coordinate frame
             init_root_ = init_state.head(3);
             mano_->setBasePos(init_state.head(3));
+
+            init_root_2 = init_state2.head(3);
+            mano_2->setBasePos(init_state2.head(3));
 
             /// set initial root orientation in global frame as origin in new coordinate frame
             raisim::Vec<4> quat;
@@ -349,6 +361,12 @@ namespace raisim {
             raisim::quatToRotMat(quat,init_rot_);
             raisim::transpose(init_rot_,init_or_);
             mano_->setBaseOrientation(init_rot_);
+
+            raisim::Vec<4> quat2;
+            raisim::eulerToQuat(init_state2.segment(3,3),quat2);
+            raisim::quatToRotMat(quat2,init_rot_2);
+            raisim::transpose(init_rot_2,init_or_2);
+            mano_2->setBaseOrientation(init_rot_2);
 
             /// set initial object pose
             obj_pos_init_  = obj_pose.cast<double>();
@@ -389,51 +407,18 @@ namespace raisim {
             actionMean_.setZero();
             actionMean_.tail(nJoints_-3) = gc_set_.tail(nJoints_-3);
 
+            actionMean_2.setZero();
+            actionMean_2.tail(nJoints_-3) = gc_set_2.tail(nJoints_-3);
+
             testing = false;
             motion_synthesis = false;
+            motion_synthesis2 = false;
             root_guiding_counter_= 0;
             obj_table_contact_ = 0;
 
             updateObservation();
         }
 
-        void reset_mano2_state(const Eigen::Ref<EigenVec>& init_state, const Eigen::Ref<EigenVec>& init_vel):
-                    /// reset gains (only required in case for inference)
-            Eigen::VectorXd jointPgain(gvDim_), jointDgain(gvDim_);
-            jointPgain.head(3).setConstant(50);
-            jointDgain.head(3).setConstant(0.1);
-            jointPgain.tail(nJoints_).setConstant(50.0);
-            jointDgain.tail(nJoints_).setConstant(0.2);
-            mano_2->setPdGains(jointPgain, jointDgain);
-
-            Eigen::VectorXd gen_force;
-            gen_force.setZero(gcDim_);
-            mano_2->setGeneralizedForce(gen_force);
-
-
-            /// set initial hand pose (45 DoF) and velocity (45 DoF)
-            gc_set_.head(6).setZero();
-            gc_set_.tail(nJoints_-3) = init_state.tail(nJoints_-3).cast<double>(); //.cast<double>();
-            gv_set_ = init_vel.cast<double>();
-            mano_2->setState(gc_set_, gv_set_);
-
-            /// set initial root position in global frame as origin in new coordinate frame
-            init_root_ = init_state.head(3);
-            mano_2->setBasePos(init_state.head(3));
-
-            /// set initial root orientation in global frame as origin in new coordinate frame
-            raisim::Vec<4> quat;
-            raisim::eulerToQuat(init_state.segment(3,3),quat);
-            raisim::quatToRotMat(quat,init_rot_);
-            raisim::transpose(init_rot_,init_or_);
-            mano_2->setBaseOrientation(init_rot_);
-
-            /// Set action mean to initial pose (first 6DoF since start at 0)
-            actionMean_.setZero();
-            actionMean_.tail(nJoints_-3) = gc_set_.tail(nJoints_-3);
-
-            updateObservation();
-        }
 
         /// This function is used to set user specified goals that the policy is conditioned on
         /// Obj_pos: Object goal state in global frame (7), 3 translation + 4 quaternion rotation
@@ -441,11 +426,15 @@ namespace raisim {
         /// goal_pose: Hand goal pose (48DoF), 3DoF global euler rotation + 45DoF local joint angles
         /// contact_pos: Deprecated (63 DoF)
         /// goal_contacts: Hand parts that should be in contact (16 hand parts)
-        void set_goals(const Eigen::Ref<EigenVec>& obj_goal_pos, const Eigen::Ref<EigenVec>& ee_goal_pos, const Eigen::Ref<EigenVec>& goal_pose, const Eigen::Ref<EigenVec>& contact_pos, const Eigen::Ref<EigenVec>& goal_contacts) final {
+        void set_goals(const Eigen::Ref<EigenVec>& obj_goal_pos, const Eigen::Ref<EigenVec>& ee_goal_pos, const Eigen::Ref<EigenVec>& goal_pose, const Eigen::Ref<EigenVec>& goal_contacts,const Eigen::Ref<EigenVec>& ee_goal_pos2, const Eigen::Ref<EigenVec>& goal_pose2, const Eigen::Ref<EigenVec>& goal_contacts2) final {
 
             raisim::Vec<4> quat_goal_hand_w, quat_goal_hand_r, quat_obj_init;
             raisim::Vec<3> euler_goal_pose;
             raisim::Mat<3,3> rotm_goal_hand_r;
+
+            raisim::Vec<4> quat_goal_hand_w2, quat_goal_hand_r2;
+            raisim::Vec<3> euler_goal_pose2;
+            raisim::Mat<3,3> rotm_goal_hand_r2;
 
             /// set final object pose
             final_obj_pos_ = obj_goal_pos.cast<double>(); //.cast<double>();
@@ -458,6 +447,10 @@ namespace raisim {
             raisim::eulerToQuat(goal_pose.head(3),quat_goal_hand_w);
             raisim::quatToRotMat(quat_goal_hand_w,root_pose_world_);
 
+
+            raisim::eulerToQuat(goal_pose2.head(3),quat_goal_hand_w2);
+            raisim::quatToRotMat(quat_goal_hand_w2,root_pose_world_2);
+
             /// Compute and set object relative goal hand pose
             raisim::quatInvQuatMul(quat_obj_init,quat_goal_hand_w,quat_goal_hand_r);
             raisim::quatToRotMat(quat_goal_hand_r,rotm_goal_hand_r);
@@ -465,6 +458,13 @@ namespace raisim {
 
             final_pose_ = goal_pose.cast<double>();
             final_pose_.head(3) = euler_goal_pose.e();
+
+            raisim::quatInvQuatMul(quat_obj_init,quat_goal_hand_w2,quat_goal_hand_r2);
+            raisim::quatToRotMat(quat_goal_hand_r2,rotm_goal_hand_r2);
+            raisim::RotmatToEuler(rotm_goal_hand_r2,euler_goal_pose2);
+
+            final_pose_2 = goal_pose2.cast<double>();
+            final_pose_2.head(3) = euler_goal_pose2.e();
 
             /// Compute and convert hand 3D joint positions into object relative frame
             for(int i=0; i<num_bodyparts; i++){
@@ -477,6 +477,16 @@ namespace raisim {
                 final_ee_pos_[i*3] = Rel_fpos[0];
                 final_ee_pos_[i*3+1] = Rel_fpos[1];
                 final_ee_pos_[i*3+2] =  Rel_fpos[2];
+
+                Position2[0] = ee_goal_pos2[i*3]-final_obj_pos_[0];
+                Position2[1] = ee_goal_pos2[i*3+1]-final_obj_pos_[1];
+                Position2[2] = ee_goal_pos2[i*3+2]-final_obj_pos_[2];
+
+                raisim::matvecmul(Obj_orientation,Position2,Rel_fpos_2);
+
+                final_ee_pos_2[i*3] = Rel_fpos_2[0];
+                final_ee_pos_2[i*3+1] = Rel_fpos_2[1];
+                final_ee_pos_2[i*3+2] =  Rel_fpos_2[2];
             }
 
             /// Intialize and set goal contact array
@@ -488,13 +498,22 @@ namespace raisim {
                 contactMapping_.insert(std::pair<int,int>(int(mano_->getBodyIdx(contact_bodies_[i])),i));
             }
 
+            num_active_contacts_2 = double(goal_contacts2.sum());
+            final_contact_array_2 = goal_contacts2.cast<double>();
+
+            for(int i=0; i<num_contacts ; i++){
+                contact_body_idx_2[i] =  mano_->getBodyIdx(contact_bodies_[i]);
+                contactMapping_2.insert(std::pair<int,int>(int(mano_->getBodyIdx(contact_bodies_[i])),i));
+            }
+
             /// Compute contact weight
             k_contact = 1.0/num_active_contacts_;
+            k_contact2 = 1.0/num_active_contacts_2;
 
         }
 
         /// This function takes an environment step given an action (51DoF) input
-        float step(const Eigen::Ref<EigenVec>& action) final {
+        float step(const Eigen::Ref<EigenVec>& action,const Eigen::Ref<EigenVec>& action2) final {
 
             raisim::Vec<4> obj_orientation_quat, quat_final_pose, quat_world;
             raisim::Mat<3, 3> rot, rot_trans, rot_world, rot_goal, rotmat_final_obj_pos, rotmat_final_obj_pos_trans;
@@ -502,38 +521,32 @@ namespace raisim {
             raisim::transpose(Obj_orientation_temp,Obj_orientation);
             obj_pos_raisim[0] = final_obj_pos_[0]-Obj_Position[0]; obj_pos_raisim[1] = final_obj_pos_[1]-Obj_Position[1]; obj_pos_raisim[2] = final_obj_pos_[2]-Obj_Position[2];
 
+            raisim::Vec<4> obj_orientation_quat2, quat_final_pose2, quat_world2;
+            raisim::Mat<3, 3> rot2, rot_trans2, rot_world2, rot_goal2, rotmat_final_obj_pos2, rotmat_final_obj_pos_trans2;
+            raisim::Vec<3> obj_pos_raisim2, euler_goal_world2, final_obj_pose_mat2, hand_pos_world2, hand_pose2, act_pos2, act_or_pose2;
+            obj_pos_raisim2[0] = final_obj_pos_2[0]-Obj_Position[0]; obj_pos_raisim2[1] = final_obj_pos_2[1]-Obj_Position[1]; obj_pos_raisim2[2] = final_obj_pos_2[2]-Obj_Position[2];
+
+
             if (motion_synthesis)
             {
-//                raisim::quatToRotMat(final_obj_pos_.tail(4),rotmat_final_obj_pos);
-//                raisim::transpose(rotmat_final_obj_pos, rotmat_final_obj_pos_trans);
-//                raisim::matvecmul(rotmat_final_obj_pos, final_ee_pos_.head(3), Fpos_world);
-//                raisim::vecadd(obj_pos_raisim, Fpos_world); //Obj_Position before
+
                 if (visualizable_)
                 {
                     spheres[0]->setPosition(pos_goal.e());
                 }
 
-                //pos_goal = action.head(3);
-                //raisim::vecsub(pos_goal, init_root_, act_pos);
                 raisim::matvecmul(init_or_,obj_pos_raisim,act_or_pose);
-
-                actionMean_.head(3) = (act_or_pose.e())*std::min(1.0,(0.001*root_guiding_counter_));
-                //std::cout << "obj_pos_raisim " << obj_pos_raisim.e() << std::endl;
-                //std::cout << "actionMean_.head(3) " << actionMean_.head(3) << std::endl;
+                actionMean_.head(3) = (act_or_pose.e())*std::min(1.0,(0.003*root_guiding_counter_));
                 actionMean_.head(3)  += gc_.head(3);
-
                 raisim::Mat<3, 3> rotmat_gc, rotmat_gc_trans, rotmat_obj_pose, posegoal_rotmat;
                 raisim::Vec<4> quat_gc, quat_pg, quat_diff;
                 raisim::Vec<3> euler_obj_pose_goal, euler_obj_pose_curr, diff_obj_pose, rot_goal_euler;
-//                pose_goal = action.segment(3,3);
-//                raisim::eulerToQuat(pose_goal,quat_pg);
+
                 raisim::quatToRotMat(final_obj_pos_.tail(4),rotmat_gc);
                 raisim::matmul(init_or_, rotmat_gc, rotmat_gc_trans);
                 raisim::RotmatToEuler(rotmat_gc_trans, euler_obj_pose_goal);
-
                 raisim::matmul(init_or_, Obj_orientation_temp, rotmat_obj_pose);
                 raisim::RotmatToEuler(rotmat_obj_pose, euler_obj_pose_curr);
-
                 raisim::vecsub(euler_obj_pose_goal, euler_obj_pose_curr, diff_obj_pose);
 
 
@@ -544,14 +557,15 @@ namespace raisim {
                         diff_obj_pose[i] += 2*pi_;
                 }
 
-                actionMean_.segment(3,3) = rel_obj_pose_ * std::min(1.0,(0.0005*root_guiding_counter_));
+
+                actionMean_.segment(3,3) = rel_obj_pose_ * std::min(1.0,(0.003*root_guiding_counter_));
                 actionMean_.segment(3,3) += gc_.segment(3,3);
                 root_guiding_counter_ += 1;
 
             }
 
             /// The following applies the wrist guidance technique (compare with paper)
-            else if (root_guided){
+            else {
                 /// Retrieve current object pose
                 if (cylinder_mesh)
                 {
@@ -580,12 +594,71 @@ namespace raisim {
                 raisim::matvecmul(init_or_,act_pos,act_or_pose); // rotate the world coordinate into hand's origin frame (from the start of the episode)
 
                 actionMean_.head(3) = act_or_pose.e();
+
             }
+
+            if (motion_synthesis2)
+            {
+                raisim::matvecmul(init_or_2,obj_pos_raisim2,act_or_pose2);
+                actionMean_2.head(3) = (act_or_pose2.e())*std::min(1.0,(0.001*root_guiding_counter_));
+                actionMean_2.head(3)  += gc_2.head(3);
+                raisim::Mat<3, 3> rotmat_gc2, rotmat_gc_trans2, rotmat_obj_pose2, posegoal_rotmat2;
+                raisim::Vec<4> quat_gc2, quat_pg2, quat_diff2;
+                raisim::Vec<3> euler_obj_pose_goal2, euler_obj_pose_curr2, diff_obj_pose2, rot_goal_euler2;
+
+                raisim::quatToRotMat(final_obj_pos_2.tail(4),rotmat_gc2);
+                raisim::matmul(init_or_2, rotmat_gc2, rotmat_gc_trans2);
+                raisim::RotmatToEuler(rotmat_gc_trans2, euler_obj_pose_goal2);
+                raisim::matmul(init_or_2, Obj_orientation_temp, rotmat_obj_pose2);
+                raisim::RotmatToEuler(rotmat_obj_pose2, euler_obj_pose_curr2);
+                raisim::vecsub(euler_obj_pose_goal2, euler_obj_pose_curr2, diff_obj_pose2);
+                for (int i = 0; i < 3; i++) {
+                    if (diff_obj_pose2[i] > pi_)
+                        diff_obj_pose2[i] -= 2*pi_;
+                    else if (diff_obj_pose2[i] < -pi_)
+                        diff_obj_pose2[i] += 2*pi_;
+                }
+                actionMean_2.segment(3,3) = rel_obj_pose_2 * std::min(1.0,(0.0005*root_guiding_counter_));
+                actionMean_2.segment(3,3) += gc_2.segment(3,3);
+            }
+
+            else {
+                if (cylinder_mesh)
+                {
+                    Obj_Position = cylinder->getPosition();
+                    Obj_orientation_temp = cylinder->getRotationMatrix();
+                    cylinder->getQuaternion(obj_quat);
+                }
+                else if (box_obj_mesh)
+                {
+                    Obj_Position = box_obj->getPosition();
+                    Obj_orientation_temp = box_obj->getRotationMatrix();
+                    box_obj->getQuaternion(obj_quat);
+                }
+                else
+                {
+                    Obj_Position = obj_mesh_1->getPosition();
+                    Obj_orientation_temp = obj_mesh_1->getRotationMatrix();
+                    obj_mesh_1->getQuaternion(obj_quat);
+                }
+
+                raisim::matvecmul(Obj_orientation_temp, final_ee_pos_2.head(3), Fpos_world);
+                raisim::vecadd(Obj_Position, Fpos_world);
+                raisim::vecsub(Fpos_world, init_root_2, act_pos2); // compute distance of curent root to initial root in world frame
+                raisim::matvecmul(init_or_2,act_pos2,act_or_pose2); // rotate the world coordinate into hand's origin frame (from the start of the episode)
+                actionMean_2.head(3) = act_or_pose2.e();
+
+
+                    }
 
             /// Compute position target for actuators
             pTarget_ = action.cast<double>();
             pTarget_ = pTarget_.cwiseProduct(actionStd_); //residual action * scaling
             pTarget_ += actionMean_; //add wrist bias (first 3DOF) and last pose (48DoF)
+
+            pTarget_2 = action2.cast<double>();
+            pTarget_2 = pTarget_2.cwiseProduct(actionStd_); //residual action * scaling
+            pTarget_2 += actionMean_2; //add wrist bias (first 3DOF) and last pose (48DoF)
 
             /// If in testing and static pose mode, replace global pTarget by static pose
             if (testing)
@@ -593,6 +666,9 @@ namespace raisim {
                 /// static global pose
                 pTarget_.head(3) = up_vec.e();
                 pTarget_.segment(3,3) = up_pose;
+
+                pTarget_2.head(3) = up_vec.e();
+                pTarget_2.segment(3,3) = up_pose;
             }
 
             /// Clip targets to limits
@@ -600,19 +676,36 @@ namespace raisim {
             pTarget_clipped.setZero(gcDim_);
             pTarget_clipped = pTarget_.cwiseMax(joint_limit_low).cwiseMin(joint_limit_high);
 
+            Eigen::VectorXd pTarget_clipped_2;
+            pTarget_clipped_2.setZero(gcDim_);
+            pTarget_clipped_2 = pTarget_2.cwiseMax(joint_limit_low).cwiseMin(joint_limit_high);
+
             /// Set PD targets (velocity zero)
+            if (motion_synthesis2)
+            {
+                pTarget_clipped.setZero(gcDim_);
+            }
+
             mano_->setPdTarget(pTarget_clipped, vTarget_);
+
+            mano_2->setPdTarget(pTarget_clipped_2, vTarget_2);
 
             /// Apply N control steps
             for(int i=0; i<  int(control_dt_ / simulation_dt_ + 1e-10); i++){
                 if(server_) server_->lockVisualizationServerMutex();
                 world_->integrate();
+                if (epoch_step<130)
+                mano_2->setState(gc_2, gv_2);
+
                 if(server_) server_->unlockVisualizationServerMutex();
             }
+
+
 
             /// update observation and set new mean to the latest pose
             updateObservation();
             actionMean_ = gc_;
+            actionMean_2 = gc_2;
 
             /// Compute general reward terms
             pose_reward_ = -(rel_pose_).norm();
@@ -647,6 +740,8 @@ namespace raisim {
             rewards_.record("body_qvel_reward_", std::max(0.0,body_qvel_reward_));
             rewards_.record("torque", std::max(0.0, mano_->getGeneralizedForce().squaredNorm()));
 
+            epoch_step++;
+
             return rewards_.sum();
         }
 
@@ -656,12 +751,21 @@ namespace raisim {
             raisim::Vec<3> body_vel, obj_frame_diff, obj_frame_diff_w, obj_frame_diff_h, euler_hand, sphere_pos, norm_pos, rel_wbody_root, euler_obj, rel_rbody_root, rel_body_table, rel_obj_init, rel_objpalm, rel_obj_pose_r3;
             raisim::Mat<3,3> rot, rot_mult, body_orientation_transpose, palm_world_pose_mat, palm_world_pose_mat_trans, obj_pose_wrist_mat, rel_pose_mat, final_obj_rotmat_temp, diff_obj_pose_mat, final_obj_wrist, obj_wrist, obj_wrist_trans, final_obj_pose_mat;
 
+            raisim::Vec<4> quat2, quat_hand2, quat_obj_init2;
+            raisim::Vec<3> body_vel2, obj_frame_diff2, obj_frame_diff_w2, obj_frame_diff_h2, euler_hand2, sphere_pos2, norm_pos2, rel_wbody_root2, euler_obj2, rel_rbody_root2, rel_body_table2, rel_obj_init2, rel_objpalm2, rel_obj_pose_r32;
+            raisim::Mat<3,3> rot2, rot_mult2, body_orientation_transpose2, palm_world_pose_mat2, palm_world_pose_mat_trans2, obj_pose_wrist_mat2, rel_pose_mat2, final_obj_rotmat_temp2, diff_obj_pose_mat2, final_obj_wrist2, obj_wrist2, obj_wrist_trans2, final_obj_pose_mat2;
+
             contacts_.setZero();
             rel_contacts_.setZero();
             impulses_.setZero();
 
+            contacts_2.setZero();
+            rel_contacts_2.setZero();
+            impulses_2.setZero();
+
             /// Get updated hand state
             mano_->getState(gc_, gv_);
+            mano_2->getState(gc_2, gv_2);
 
             /// Get updated object pose
             if (cylinder_mesh)
@@ -692,59 +796,97 @@ namespace raisim {
 
             /// compute relative hand pose
             rel_pose_ = final_pose_-gc_.tail(gcDim_-3);
+            rel_pose_2 = final_pose_2-gc_2.tail(gcDim_-3);
 
             /// compute object pose in wrist frame
             mano_->getFrameOrientation(body_parts_[0], palm_world_pose_mat);
             raisim::transpose(palm_world_pose_mat,palm_world_pose_mat_trans);
-
             raisim::matmul(palm_world_pose_mat_trans, Obj_orientation_temp, obj_pose_wrist_mat);
             raisim::RotmatToEuler(obj_pose_wrist_mat, obj_pose_);
+
+            mano_2->getFrameOrientation(body_parts_[0], palm_world_pose_mat2);
+            raisim::transpose(palm_world_pose_mat2,palm_world_pose_mat_trans2);
+            raisim::matmul(palm_world_pose_mat_trans2, Obj_orientation_temp, obj_pose_wrist_mat2);
+            raisim::RotmatToEuler(obj_pose_wrist_mat2, obj_pose_2);
 
             /// iterate over all hand parts to compute relative distances, poses, etc.
             for(int i=0; i< num_bodyparts ; i++){
                 mano_->getFramePosition(body_parts_[i], Position);
                 mano_->getFrameOrientation(body_parts_[i], Body_orientation);
+
+                mano_2->getFramePosition(body_parts_[i], Position2);
+                mano_2->getFrameOrientation(body_parts_[i], Body_orientation2);
                 /// for the hand root, compute relevant features
                 if (i==0)
                 {
                     raisim::transpose(Body_orientation, body_orientation_transpose);
+                    raisim::transpose(Body_orientation2, body_orientation_transpose2);
                     rel_objpalm[0] = Position[0]-Obj_Position[0];
                     rel_objpalm[1] = Position[1]-Obj_Position[1];
                     rel_objpalm[2] = Position[2]-Obj_Position[2];
 
+                    rel_objpalm2[0] = Position2[0]-Obj_Position[0];
+                    rel_objpalm2[1] = Position2[1]-Obj_Position[1];
+                    rel_objpalm2[2] = Position2[2]-Obj_Position[2];
+
                     rel_objpalm_pos_ = Body_orientation.e().transpose()*rel_objpalm.e(); // relative position between object and wrist in wrist coordinates
+                    rel_objpalm_pos_2 = Body_orientation2.e().transpose()*rel_objpalm2.e(); // relative position between object and wrist in wrist coordinates
 
                     rel_body_table[0] = 0.0;
                     rel_body_table[1] = 0.0;
                     rel_body_table[2] = Position[2]-0.5;
                     rel_body_table_pos_ = Body_orientation.e().transpose()*rel_body_table.e(); // z-distance to the table in wrist coordinates
 
+                    rel_body_table2[0] = 0.0;
+                    rel_body_table2[1] = 0.0;
+                    rel_body_table2[2] = Position2[2]-0.5;
+                    rel_body_table_pos_2 = Body_orientation2.e().transpose()*rel_body_table2.e(); // z-distance to the table in wrist coordinates
+
                     rel_obj_init[0] = obj_pos_init_[0] - Obj_Position[0];
                     rel_obj_init[1] = obj_pos_init_[1] - Obj_Position[1];
                     rel_obj_init[2] = obj_pos_init_[2] - Obj_Position[2];
 
                     rel_obj_pos_ = Body_orientation.e().transpose()*rel_obj_init.e(); // object displacement from initial position in wrist coordinates
+                    rel_obj_pos_2 = Body_orientation2.e().transpose()*rel_obj_init.e(); // object displacement from initial position in wrist coordinates
 
                     raisim::matmul(Obj_orientation, Body_orientation, rot_mult); // current global wirst pose in object relative frame
                     raisim::RotmatToEuler(rot_mult,euler_hand);
 
+                    raisim::matmul(Obj_orientation, Body_orientation2, rot_mult2); // current global wirst pose in object relative frame
+                    raisim::RotmatToEuler(rot_mult2,euler_hand2);
+
                     rel_pose_.head(3) = final_pose_.head(3) - euler_hand.e(); // difference between target and current global wrist pose
+                    rel_pose_2.head(3) = final_pose_2.head(3) - euler_hand2.e(); // difference between target and current global wrist pose
+
 
                     bodyLinearVel_ =  gv_.segment(0, 3);
                     bodyAngularVel_ = gv_.segment(3, 3);
 
+                    bodyLinearVel_2 =  gv_2.segment(0, 3);
+                    bodyAngularVel_2 = gv_2.segment(3, 3);
+
                     rel_obj_vel = Body_orientation.e().transpose() * Obj_linvel.e();  // relative object velocity
                     rel_obj_qvel = Body_orientation.e().transpose() * Obj_qvel.e();  // relative object angular velocity
 
-                    raisim::quatToRotMat(final_obj_pos_.segment(3,4),final_obj_pose_mat);
+                    rel_obj_vel_2 = Body_orientation2.e().transpose() * Obj_linvel.e();  // relative object velocity
+                    rel_obj_qvel_2 = Body_orientation2.e().transpose() * Obj_qvel.e();  // relative object angular velocity
 
+                    raisim::quatToRotMat(final_obj_pos_.segment(3,4),final_obj_pose_mat);
                     raisim::matmul(init_or_, final_obj_pose_mat, final_obj_wrist); // target object orientation in initial wrist frame
                     raisim::matmul(init_or_, Obj_orientation_temp, obj_wrist); // current object orientation in initial wrist frame
                     raisim::transpose(obj_wrist, obj_wrist_trans);
-
                     raisim::matmul(final_obj_wrist, obj_wrist_trans, diff_obj_pose_mat); // distance between current obj and target obj pose
                     raisim::RotmatToEuler(diff_obj_pose_mat,rel_obj_pose_r3);
                     rel_obj_pose_ = rel_obj_pose_r3.e();
+
+                    raisim::quatToRotMat(final_obj_pos_2.segment(3,4),final_obj_pose_mat2);
+                    raisim::matmul(init_or_2, final_obj_pose_mat2, final_obj_wrist2); // target object orientation in initial wrist frame
+                    raisim::matmul(init_or_2, Obj_orientation_temp, obj_wrist2); // current object orientation in initial wrist frame
+                    raisim::transpose(obj_wrist2, obj_wrist_trans2);
+                    raisim::matmul(final_obj_wrist2, obj_wrist_trans2, diff_obj_pose_mat2); // distance between current obj and target obj pose
+                    raisim::RotmatToEuler(diff_obj_pose_mat2,rel_obj_pose_r32);
+                    rel_obj_pose_2 = rel_obj_pose_r32.e();
+
 
                 }
 
@@ -754,21 +896,37 @@ namespace raisim {
                 Position[2] = Position[2]-Obj_Position[2];
                 raisim::matvecmul(Obj_orientation,Position,Rel_fpos); // compute current relative pose in object coordinates
 
+                Position2[0] = Position2[0]-Obj_Position[0];
+                Position2[1] = Position2[1]-Obj_Position[1];
+                Position2[2] = Position2[2]-Obj_Position[2];
+                raisim::matvecmul(Obj_orientation,Position2,Rel_fpos_2); // compute current relative pose in object coordinates
+
                 obj_frame_diff[0] = final_ee_pos_[i * 3]- Rel_fpos[0];
                 obj_frame_diff[1] = final_ee_pos_[i * 3 + 1] - Rel_fpos[1];
                 obj_frame_diff[2] = final_ee_pos_[i * 3 + 2] - Rel_fpos[2]; // distance between target 3D positions and current 3D positions in object frame
 
+                obj_frame_diff2[0] = final_ee_pos_2[i * 3]- Rel_fpos_2[0];
+                obj_frame_diff2[1] = final_ee_pos_2[i * 3 + 1] - Rel_fpos_2[1];
+                obj_frame_diff2[2] = final_ee_pos_2[i * 3 + 2] - Rel_fpos_2[2]; // distance between target 3D positions and current 3D positions in object frame
+
                 raisim::matvecmul(Obj_orientation_temp,obj_frame_diff,obj_frame_diff_w); // convert distances to world frame
                 raisim::matvecmul(body_orientation_transpose,obj_frame_diff_w,obj_frame_diff_h); // convert distances to wrist frame
+
+                raisim::matvecmul(Obj_orientation_temp,obj_frame_diff2,obj_frame_diff_w2); // convert distances to world frame
+                raisim::matvecmul(body_orientation_transpose2,obj_frame_diff_w2,obj_frame_diff_h2); // convert distances to wrist frame
 
                 rel_body_pos_[i * 3] = obj_frame_diff_h[0];
                 rel_body_pos_[i * 3 + 1] = obj_frame_diff_h[1];
                 rel_body_pos_[i * 3 + 2] = obj_frame_diff_h[2];
 
+                rel_body_pos_2[i * 3] = obj_frame_diff_h2[0];
+                rel_body_pos_2[i * 3 + 1] = obj_frame_diff_h2[1];
+                rel_body_pos_2[i * 3 + 2] = obj_frame_diff_h2[2];
+
                 /// visualization of 3D joint position goals on the object
                 if (visualizable_)
                 {
-                    raisim::matvecmul(Obj_orientation_temp,{final_ee_pos_[i * 3], final_ee_pos_[i * 3 + 1], final_ee_pos_[i * 3 + 2]},sphere_pos);
+                    raisim::matvecmul(Obj_orientation_temp,{final_ee_pos_2[i * 3], final_ee_pos_2[i * 3 + 1], final_ee_pos_2[i * 3 + 2]},sphere_pos);
                     vecadd(Obj_Position, sphere_pos);
                     spheres[i]->setPosition(sphere_pos.e());
                 }
@@ -782,9 +940,16 @@ namespace raisim {
                 impulses_[contactMapping_[contact.getlocalBodyIndex()]] = contact.getImpulse().norm();
             }
 
+/// compute current contacts of hand parts and the contact force
+            for(auto& contact: mano_2->getContacts()) {
+                if (contact.skip() || contact.getPairObjectIndex() != obj_idx_) continue;
+                contacts_2[contactMapping_2[contact.getlocalBodyIndex()]] = 1;
+                impulses_2[contactMapping_2[contact.getlocalBodyIndex()]] = contact.getImpulse().norm();
+            }
+
             /// compute relative target contact vector, i.e., which goal contacts are currently in contact
             rel_contacts_ = final_contact_array_.cwiseProduct(contacts_);
-
+            rel_contacts_2 = final_contact_array_2.cwiseProduct(contacts_2);
 
             int obj_table_contact = 0;
 
@@ -841,11 +1006,37 @@ namespace raisim {
 
                     Obj_Position.e(),
                     obj_table_contact;
+
+            obDouble_2 <<
+            // hand info
+                    gc_2,
+                    bodyLinearVel_2,
+                    bodyAngularVel_2,
+                    gv_2.tail(gvDim_ - 6),
+                    impulses_2,
+                    rel_body_table_pos_2,
+
+            // label info
+                    rel_body_pos_2,
+                    rel_pose_2,
+                    final_contact_array_2,
+                    rel_contacts_2,
+
+            // obj info
+                    rel_objpalm_pos_2,
+                    obj_pose_2.e(),
+                    rel_obj_pos_2,
+                    rel_obj_vel_2,
+                    rel_obj_qvel_2,
+
+                    Obj_Position.e(),
+                    obj_table_contact;
         }
 
         /// Set observation in wrapper to current observation
-        void observe(Eigen::Ref<EigenVec> ob) final {
+        void observe(Eigen::Ref<EigenVec> ob,Eigen::Ref<EigenVec> ob2) final {
             ob = obDouble_.cast<float>();
+            ob2 = obDouble_2.cast<float>();
         }
 
         /// This function is only relevant for testing
@@ -853,6 +1044,7 @@ namespace raisim {
         void set_root_control(const Eigen::Ref<EigenVec>& obj_goal_pos) final {
             final_obj_pos_ = obj_goal_pos.cast<double>();
             //testing = true;
+
             motion_synthesis = true;
 
             Eigen::VectorXd jointPgain(gvDim_), jointDgain(gvDim_);
@@ -902,6 +1094,67 @@ namespace raisim {
 
         }
 
+        void set_root_control2(const Eigen::Ref<EigenVec>& obj_goal_pos) final {
+            final_obj_pos_2 = obj_goal_pos.cast<double>();
+
+            //testing = true;
+
+            motion_synthesis2 = true;
+
+            Eigen::VectorXd jointPgain(gvDim_), jointDgain(gvDim_);
+            jointPgain.head(3).setConstant(200);
+            jointDgain.head(3).setConstant(0.1);
+            jointPgain.tail(nJoints_).setConstant(50.0);
+            jointDgain.tail(nJoints_).setConstant(0.2);
+
+            mano_2->setPdGains(jointPgain, jointDgain);
+
+
+            jointPgain.head(3).setConstant(10.0);
+            jointDgain.head(3).setConstant(0.1);
+            jointPgain.tail(nJoints_).setConstant(1);
+            jointDgain.tail(nJoints_).setConstant(0.2);
+
+            mano_->setPdGains(jointPgain, jointDgain);
+
+            obj_mesh_2->setPosition(final_obj_pos_2[0],final_obj_pos_2[1],final_obj_pos_2[2]);
+            obj_mesh_2->setOrientation(final_obj_pos_2[3],final_obj_pos_2[4],final_obj_pos_2[5],final_obj_pos_2[6]);
+            obj_mesh_2->setVelocity(0,0,0,0,0,0);
+            obj_mesh_2->setAppearance("0 1 0 0.5");
+
+            /// lower the surface box
+            //box->setPosition(1.25,0,0.0);
+
+            /// If rendered, also lower the visualized table
+//            if (visualizable_) {
+//                table_top->setPosition(1.25, 0, 0.225);
+//                leg1->setPosition(0.2625, 0.4875, -0.015);
+//                leg2->setPosition(2.2475, 0.4875, -0.015);
+//                leg3->setPosition(0.2625, -0.4875, -0.015);
+//                leg4->setPosition(2.2475, -0.4875, -0.015);
+//            }
+
+            raisim::Vec<3> frame_pos;
+            raisim::Mat<3,3> root_orientation, root_orientation_trans;
+
+            mano_2->getFrameOrientation(body_parts_[0], root_orientation);
+            mano_2->getFramePosition(body_parts_[0], frame_pos);
+            raisim::transpose(root_orientation, root_orientation_trans);
+
+            /// account for object weight
+            raisim::matvecmul(init_or_2,{0, 0, obj_weight_*10},up_gen_vec);
+            gen_force_.setZero(gcDim_);
+            gen_force_.head(3) = up_gen_vec.e();
+            mano_2->setGeneralizedForce(gen_force_);
+            /// fix pTargets to static pose
+            up_vec[0] = gc_[0];
+            up_vec[1] = gc_[1];
+            up_vec[2] = gc_[2];
+            up_pose = gc_.segment(3,3);
+            gc_set_ = gc_;
+
+        }
+
         /// Since the episode lengths are fixed, this function is used to catch instabilities in simulation and reset the env in such cases
         bool isTerminalState(float& terminalReward) final {
             raisim::Vec<3> pos_ff;
@@ -939,8 +1192,10 @@ namespace raisim {
         double k_pose = 0.5;
         double k_ee = 1.0;
         double k_contact = 1.0;
+        double k_contact2 = 1.0;
         double ray_length = 0.05;
         double num_active_contacts_;
+        double num_active_contacts_2;
         double impulse_reward_ = 0.0;
         double obj_weight_;
         Eigen::VectorXd joint_limit_high, joint_limit_low, actionMean_, actionStd_, obDouble_, rel_pose_, finger_weights_, rel_obj_pos_, rel_objpalm_pos_, rel_body_pos_, rel_contact_pos_, rel_contacts_, contacts_, impulses_, rel_obj_pose_;
@@ -959,6 +1214,7 @@ namespace raisim {
         int obj_table_contact_ = 0;
         int root_guiding_counter_ = 10;
         int obj_idx_;
+        int epoch_step=0;
         bool root_guided=false;
         bool cylinder_mesh=false;
         bool box_obj_mesh=false;
@@ -968,11 +1224,13 @@ namespace raisim {
         bool nohierarchy = false;
         bool contact_pruned = false;
         bool motion_synthesis = false;
+        bool motion_synthesis2 = false;
+        bool freeze_mano2 = true;
         raisim::Vec<3> pose_goal, pos_goal, up_vec, up_gen_vec, obj_pose_, Position, Obj_Position, Rel_fpos, Obj_linvel, Obj_qvel, Fpos_world, init_root_;
-        raisim::Vec<3> pose_goal_2, pos_goal_2, up_vec_2, up_gen_vec_2, obj_pose_2, Position_2, Obj_Position_2, Rel_fpos_2, Obj_linvel_2, Obj_qvel_2, Fpos_world_2, init_root_2;
+        raisim::Vec<3> pose_goal_2, pos_goal_2, up_vec_2, up_gen_vec_2, obj_pose_2, Position2, Obj_Position_2, Rel_fpos_2, Obj_linvel_2, Obj_qvel_2, Fpos_world_2, init_root_2;
 
         raisim::Mat<3,3> Obj_orientation, Obj_orientation_temp, Body_orientation, init_or_, root_pose_world_, init_rot_;
-        raisim::Mat<3,3> Obj_orientation_2, Obj_orientation_temp_2, Body_orientation_2, init_or_2, root_pose_world_2, init_rot_2;
+        raisim::Mat<3,3> Body_orientation2, init_or_2, root_pose_world_2, init_rot_2;
         raisim::Vec<4> obj_quat;
         std::vector<int> contact_idxs_;
         std::string body_parts_[21] =  {"WRJ0rz",
@@ -1016,7 +1274,7 @@ namespace raisim {
         raisim::PolyLine *lines[21];
         raisim::Visuals *spheres[21];
         raisim::Visuals *table_top, *leg1,*leg2,*leg3,*leg4, *plane;
-        std::map<int,int> contactMapping_;
+        std::map<int,int> contactMapping_, contactMapping_2;
         std::string resourceDir_;
         std::vector<raisim::Vec<2>> joint_limits_;
         raisim::PolyLine *line;

@@ -86,8 +86,6 @@ for key in dict_labels:
     for key2 in dict_labels[key]:
         dict_labels[key][key2] = dict_labels[key][key2][:10]
 
-
-
 # dict_labels = joblib.load("raisimGymTorch/data/dexycb_test_graspgen.pkl")
 
 
@@ -127,6 +125,10 @@ ppo = get_ppo(mod)
 ### Loading a pretrained model
 load_param(saver.data_dir.split('eval')[0]+args.weight, env, ppo.actor, ppo.critic, ppo.optimizer, saver.data_dir,args.cfg, store_again=False)
 
+stage1 = 40
+stage2 = stage1+90
+stage3 = stage2+40
+end = stage3+30
 
 ### Evaluate trained model visually (note always the first environment gets visualized)
 if args.vis_evaluate:
@@ -142,24 +144,28 @@ if args.vis_evaluate:
         set_guide=False
         env.move_to_first(i)
 
-        next_obs,info = env.reset(add_noise=False)
+        next_obs,next_obs2, info = env.reset(add_noise=False)
         time.sleep(1)
-        for step in range(n_steps):
-            obs = next_obs
+        for step in range(end):
             ### Get action from policy
-            action_pred = ppo.actor.architecture(torch.from_numpy(obs).to(device))
+            action_pred = ppo.actor.architecture(torch.from_numpy(next_obs).to(device))
+            action_pred2 = ppo.actor.architecture(torch.from_numpy(next_obs2).to(device))
+
             frame_start = time.time()
-
             action_ll = action_pred.cpu().detach().numpy()
+            action_ll2 = action_pred2.cpu().detach().numpy()
+            #action_ll2[:, :6] = 0
             ### After grasp is established remove surface and test stability
-            if step==grasp_steps:
-
+            if step==stage1:
                 env.set_root_control()
-            if step>=grasp_steps:
+            if step>=stage1:
                 action_ll[:,:6]=0
+            if step==stage3:
+                env.set_root_control2()
+            if step>=stage3:
+                action_ll2[:,:6]=0
 
-
-            next_obs,reward, dones,info = env.step(action_ll)
+            next_obs,next_obs2, reward, dones,info = env.step(action_ll,action_ll2)
 
             frame_end = time.time()
             wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
