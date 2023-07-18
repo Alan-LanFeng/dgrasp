@@ -127,8 +127,8 @@ load_param(saver.data_dir.split('eval')[0]+args.weight, env, ppo.actor, ppo.crit
 
 stage1 = 40
 stage2 = stage1+90
-stage3 = stage2+40
-end = stage3+30
+stage3 = stage2+45
+end = stage3+50
 
 ### Evaluate trained model visually (note always the first environment gets visualized)
 if args.vis_evaluate:
