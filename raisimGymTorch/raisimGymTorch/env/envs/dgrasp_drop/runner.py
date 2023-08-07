@@ -55,13 +55,13 @@ print(f"Experiment name: \"{args.exp_name}\"")
 ### load config
 cfg = YAML().load(open(task_path+'/cfgs/' + args.cfg, 'r'))
 if cfg['module'] == 'MLP':
-    mod = ppo_module.MLP
+    mod = ppo_module.MLP_network
     cfg['environment']['get_pcd'] = False
     cfg['environment']['extra_dim'] = 1
 elif cfg['module'] == 'mcg':
-    mod = ppo_module.MLP
+    mod = ppo_module.pn_pcd
     cfg['environment']['get_pcd'] = True
-    cfg['environment']['extra_dim'] = 404
+    cfg['environment']['extra_dim'] = 601
 if args.exp_name != 'test':
     wandb.init(project='dgrasp',config=cfg,name = args.exp_name)
 
@@ -121,7 +121,7 @@ for update in range(args.num_iterations):
     average_dones = 0.
 
     ### Store policy
-    if update % cfg['environment']['eval_every_n'] == 0 and update:
+    if update % cfg['environment']['eval_every_n'] == 0:
         print("Visualizing and evaluating the current policy")
         torch.save({
             'actor_architecture_state_dict': ppo.actor.architecture.state_dict(),
@@ -192,6 +192,7 @@ for update in range(args.num_iterations):
             r_0[k] = r_0[k] + reward_info[i][k]
         r_0[k] = r_0[k] / len(reward_info)
     r_0['crush_rate'] = success_rate
+
 
     wandb.log(r_0)
 
