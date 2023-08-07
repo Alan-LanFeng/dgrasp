@@ -225,6 +225,9 @@ class RaisimGymVecEnv:
             #     show_pointcloud_objhand(verts[0].cpu().detach().numpy(),obj_pcd[0].reshape(-1,3))
 
             obs = np.concatenate([obs, obj_pcd.astype(np.float32)], axis=1)
+
+        obs[:,121:232]=0
+
         info = {}
         info['meta_info'] = meta_info
         if self.normalize_ob:

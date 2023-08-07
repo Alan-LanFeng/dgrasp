@@ -87,7 +87,7 @@ else:
     repeated_label = repeat_label(dict_labels[args.obj_id], args.num_repeats)
 # for k,v in dict_labels.items():
 #     dict_labels[k] = v[:10]
-
+repeated_label['final_contacts'][:]=1
 num_envs = repeated_label['final_qpos'].shape[0]
 cfg['environment']['num_envs'] = num_envs
 cfg["testing"] = True if args.test else False
@@ -121,7 +121,7 @@ for update in range(args.num_iterations):
     average_dones = 0.
 
     ### Store policy
-    if update % cfg['environment']['eval_every_n'] == 0:
+    if update % cfg['environment']['eval_every_n'] == 0 and update != 0:
         print("Visualizing and evaluating the current policy")
         torch.save({
             'actor_architecture_state_dict': ppo.actor.architecture.state_dict(),

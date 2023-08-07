@@ -1,6 +1,6 @@
 seed: 1
 record_video: yes
-module: mcg
+module: MLP
 
 environment:
   get_pcd: True
@@ -33,7 +33,7 @@ environment:
   reward_clip: -2.0
   reward:
     pos_reward:
-      coeff: 2.0
+      coeff: 0.0
     pose_reward:
       coeff: 0.0
 #    root_pos_reward_:
