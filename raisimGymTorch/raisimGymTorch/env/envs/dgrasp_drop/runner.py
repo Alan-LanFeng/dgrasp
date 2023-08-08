@@ -31,7 +31,7 @@ def get_ppo(mod):
                   num_learning_epochs=4,
                   gamma=0.996,
                   lam=0.95,
-                  num_mini_batches=4,
+                  num_mini_batches=32,
                   device=device,
                   log_dir=saver.data_dir,
                   shuffle_batch=False

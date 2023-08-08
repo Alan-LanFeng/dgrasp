@@ -94,60 +94,21 @@ class PPO:
         if log_this_iteration:
             self.log({**locals(), **infos, 'it': update})
 
-    def log(self, variables):
-        self.tot_timesteps += self.num_transitions_per_env * self.num_envs
-        mean_std = self.actor.distribution.std.mean()
-        # self.writer.add_scalar('PPO/value_function', variables['mean_value_loss'], variables['it'])
-        # self.writer.add_scalar('PPO/surrogate', variables['mean_surrogate_loss'], variables['it'])
-        # self.writer.add_scalar('PPO/mean_noise_std', mean_std.item(), variables['it'])
-        # self.writer.add_scalar('PPO/learning_rate', self.learning_rate, variables['it'])
-
-    def _train_step(self, log_this_iteration):
+    def _train_step(self, log_this_iteration):  # add a new parameter for accumulation steps
         mean_value_loss = 0
         mean_surrogate_loss = 0
+        accumulation_steps = int(self.num_mini_batches/4)
         for epoch in range(self.num_learning_epochs):
-            for actor_obs_batch, critic_obs_batch, actions_batch, old_sigma_batch, old_mu_batch, current_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch,mask \
-                    in self.batch_sampler(self.num_mini_batches):
+            for minibatch_idx, (
+            actor_obs_batch, critic_obs_batch, actions_batch, old_sigma_batch, old_mu_batch, current_values_batch,
+            advantages_batch, returns_batch, old_actions_log_prob_batch, mask) in enumerate(
+                    self.batch_sampler(self.num_mini_batches)):
+
                 mask = mask.squeeze(-1)
-                #mask[:] = True
-                valid_sum = max(mask.sum(),1)
-
-
-                ###############################
-                # batch_size = len(actor_obs_batch)
-                # mini_batch_size = 4096  # You can set this value according to your GPU memory
-                #
-                # actions_log_prob_list = []
-                # entropy_list = []
-                # value_list = []
-                #
-                # for start_idx in range(0, batch_size, mini_batch_size):
-                #     end_idx = min(start_idx + mini_batch_size, batch_size)
-                #     mini_actor_obs_batch = actor_obs_batch[start_idx:end_idx]
-                #     mini_actions_batch = actions_batch[start_idx:end_idx]
-                #     mini_critic_obs_batch = critic_obs_batch[
-                #                             start_idx:end_idx]  # Assuming critic_obs_batch is defined similarly to actor_obs_batch
-                #
-                #     with torch.no_grad():  # This tells PyTorch not to build a computational graph
-                #         actions_log_prob_mini_batch, entropy_mini_batch = self.actor.evaluate(mini_actor_obs_batch,
-                #                                                                               mini_actions_batch)
-                #         value_mini_batch = self.critic.evaluate(mini_critic_obs_batch)
-                #
-                #     actions_log_prob_list.append(
-                #         actions_log_prob_mini_batch.detach())  # Detach from the computational graph
-                #     entropy_list.append(entropy_mini_batch.detach())
-                #     value_list.append(value_mini_batch.detach())  # Detach from the computational graph
-                #
-                # actions_log_prob_batch = torch.cat(actions_log_prob_list, dim=0)
-                # entropy_batch = torch.cat(entropy_list, dim=0)
-                # value_batch = torch.cat(value_list, dim=0)  # Concatenate the values
-
+                valid_sum = max(mask.sum(), 1)
 
                 actions_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, actions_batch)
                 value_batch = self.critic.evaluate(critic_obs_batch)
-             ##########################
-
-
 
                 # Adjusting the learning rate using KL divergence
                 mu_batch = self.actor.action_mean
@@ -186,21 +147,34 @@ class PPO:
                 else:
                     value_loss = (returns_batch - value_batch).pow(2).mean()
                 entropy_loss = (entropy_batch * mask).sum() / valid_sum
-                loss = surrogate_loss + self.value_loss_coef * value_loss #- self.entropy_coef * entropy_loss
 
-                # Gradient step
-                self.optimizer.zero_grad()
+                loss = surrogate_loss + self.value_loss_coef * value_loss  # - self.entropy_coef * entropy_loss
+
+                # Gradient accumulation
+                loss = loss / accumulation_steps  # Scale the loss by accumulation steps
                 loss.backward()
-                nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters()], self.max_grad_norm)
-                self.optimizer.step()
+
+                # Perform gradient clipping and step after every 'accumulation_steps' mini-batches
+                if (minibatch_idx + 1) % accumulation_steps == 0:
+                    nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters()], self.max_grad_norm)
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()  # Resetting the gradients to zero for the next accumulation
 
                 if log_this_iteration:
-                    mean_value_loss += value_loss.item()
-                    mean_surrogate_loss += surrogate_loss.item()
+                    mean_value_loss += value_loss.item() * accumulation_steps  # Correct the mean by the accumulation steps
+                    mean_surrogate_loss += surrogate_loss.item() * accumulation_steps  # Correct the mean by the accumulation steps
 
-        if log_this_iteration:
-            num_updates = self.num_learning_epochs * self.num_mini_batches
-            mean_value_loss /= num_updates
-            mean_surrogate_loss /= num_updates
+            if log_this_iteration:
+                num_updates = self.num_learning_epochs * self.num_mini_batches
+                mean_value_loss /= num_updates
+                mean_surrogate_loss /= num_updates
 
-        return mean_value_loss, mean_surrogate_loss, locals()
+            return mean_value_loss, mean_surrogate_loss, locals()
+
+    def log(self, variables):
+        self.tot_timesteps += self.num_transitions_per_env * self.num_envs
+        mean_std = self.actor.distribution.std.mean()
+        # self.writer.add_scalar('PPO/value_function', variables['mean_value_loss'], variables['it'])
+        # self.writer.add_scalar('PPO/surrogate', variables['mean_surrogate_loss'], variables['it'])
+        # self.writer.add_scalar('PPO/mean_noise_std', mean_std.item(), variables['it'])
+        # self.writer.add_scalar('PPO/learning_rate', self.learning_rate, variables['it'])
