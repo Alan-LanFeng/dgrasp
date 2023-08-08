@@ -6,6 +6,7 @@ import torch.utils.data
 import numpy as np
 import torch.nn.functional as F
 from pytorch_lightning.core.lightning import LightningModule
+from raisimGymTorch.algo.ppo.pointnet_encoder import PointNetEncoder_mtr
 
 class Actor:
     def __init__(self, architecture, distribution, device='cpu'):
@@ -127,15 +128,15 @@ class pn_pcd(nn.Module):
         self.input_shape = [input_size]
         self.output_shape = [output_size]
 
-        self.obj_pcd_embed = PointNetEncoder()
+        self.obj_pcd_embed = PointNetEncoder_mtr(in_channels=3,hidden_dim=hidden_dim,out_channels=hidden_dim)
 
     def forward(self,obs):
         n_env,_ = obs.shape
         obj_pcd = obs[:,280:].reshape(n_env,-1,3)
         hand_info = obs[:,:280]
 
-        obj_pcd = obj_pcd.permute(0,2,1)
-        obj_pcd_encode = self.obj_pcd_embed(obj_pcd)*0.1
+        #obj_pcd = obj_pcd.permute(0,2,1)
+        obj_pcd_encode = self.obj_pcd_embed(obj_pcd)*0.2
 
         feature_inp = torch.cat([hand_info,obj_pcd_encode],dim=-1)
         pred = self.mlp(feature_inp)

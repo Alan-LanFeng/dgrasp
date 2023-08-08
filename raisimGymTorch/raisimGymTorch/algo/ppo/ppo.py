@@ -112,8 +112,42 @@ class PPO:
                 #mask[:] = True
                 valid_sum = max(mask.sum(),1)
 
+
+                ###############################
+                # batch_size = len(actor_obs_batch)
+                # mini_batch_size = 4096  # You can set this value according to your GPU memory
+                #
+                # actions_log_prob_list = []
+                # entropy_list = []
+                # value_list = []
+                #
+                # for start_idx in range(0, batch_size, mini_batch_size):
+                #     end_idx = min(start_idx + mini_batch_size, batch_size)
+                #     mini_actor_obs_batch = actor_obs_batch[start_idx:end_idx]
+                #     mini_actions_batch = actions_batch[start_idx:end_idx]
+                #     mini_critic_obs_batch = critic_obs_batch[
+                #                             start_idx:end_idx]  # Assuming critic_obs_batch is defined similarly to actor_obs_batch
+                #
+                #     with torch.no_grad():  # This tells PyTorch not to build a computational graph
+                #         actions_log_prob_mini_batch, entropy_mini_batch = self.actor.evaluate(mini_actor_obs_batch,
+                #                                                                               mini_actions_batch)
+                #         value_mini_batch = self.critic.evaluate(mini_critic_obs_batch)
+                #
+                #     actions_log_prob_list.append(
+                #         actions_log_prob_mini_batch.detach())  # Detach from the computational graph
+                #     entropy_list.append(entropy_mini_batch.detach())
+                #     value_list.append(value_mini_batch.detach())  # Detach from the computational graph
+                #
+                # actions_log_prob_batch = torch.cat(actions_log_prob_list, dim=0)
+                # entropy_batch = torch.cat(entropy_list, dim=0)
+                # value_batch = torch.cat(value_list, dim=0)  # Concatenate the values
+
+
                 actions_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, actions_batch)
                 value_batch = self.critic.evaluate(critic_obs_batch)
+             ##########################
+
+
 
                 # Adjusting the learning rate using KL divergence
                 mu_batch = self.actor.action_mean
@@ -152,7 +186,7 @@ class PPO:
                 else:
                     value_loss = (returns_batch - value_batch).pow(2).mean()
                 entropy_loss = (entropy_batch * mask).sum() / valid_sum
-                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_loss
+                loss = surrogate_loss + self.value_loss_coef * value_loss #- self.entropy_coef * entropy_loss
 
                 # Gradient step
                 self.optimizer.zero_grad()

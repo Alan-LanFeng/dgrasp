@@ -121,7 +121,7 @@ for update in range(args.num_iterations):
     average_dones = 0.
 
     ### Store policy
-    if update % cfg['environment']['eval_every_n'] == 0:
+    if update % cfg['environment']['eval_every_n'] == 0 and update != 0:
         print("Visualizing and evaluating the current policy")
         torch.save({
             'actor_architecture_state_dict': ppo.actor.architecture.state_dict(),
