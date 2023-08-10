@@ -167,7 +167,7 @@ class RaisimGymVecEnv:
 
         pca_dist = joint_pca_norm * pca_target_norm
         cos_sim = pca_dist.sum(-1)-1
-        cos_sim[cos_sim>-0.3] *= 0.1
+        cos_sim[cos_sim>-0.35] *= 0.1
         return cos_sim
 
     def load_scaling(self, dir_name, iteration, count=1e5):
