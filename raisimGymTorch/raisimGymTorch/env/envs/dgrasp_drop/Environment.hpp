@@ -641,9 +641,9 @@ namespace raisim {
                 if (i==0)
                 {
                     raisim::transpose(Body_orientation, body_orientation_transpose);
-                    rel_objpalm[0] = Obj_Position[0]-Position[0];
-                    rel_objpalm[1] = Obj_Position[1]-Position[1];
-                    rel_objpalm[2] = Obj_Position[2]-Position[2];
+                    rel_objpalm[0] = Position[0]-Obj_Position[0];
+                    rel_objpalm[1] = Position[1]-Obj_Position[1];
+                    rel_objpalm[2] = Position[2]-Obj_Position[2];
 
                     rel_objpalm_pos_ = Body_orientation.e().transpose()*rel_objpalm.e(); // relative position between object and wrist in wrist coordinates
 
@@ -795,8 +795,24 @@ namespace raisim {
                 return true;
             }
 
-           if (time_step == 100)
+           if (time_step == 50)
             {
+                if (cylinder_mesh)
+                {
+                    Obj_Position = cylinder->getPosition();
+                }
+                else if (box_obj_mesh)
+                {
+                    Obj_Position = box_obj->getPosition();
+                }
+                else
+                {
+                    Obj_Position = obj_mesh_1->getPosition();
+                }
+                height_diff = obj_pos_init_[2]-Obj_Position[2];
+                if (height_diff>0.2)
+                {
+
                     box->getPosition(0,table_pos);
                     // print warning
 //                    std::cout << "Warning: Object is falling" << std::endl;
@@ -814,8 +830,10 @@ namespace raisim {
                         box->setPosition(1.25, 0, 0.25);
                         box->setOrientation(1,0,0,0);
                         box->setVelocity(0,0,0,0,0,0);
-                        return true;
                     }
+
+                    return true;
+                }
 
             }
 
