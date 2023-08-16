@@ -638,9 +638,9 @@ namespace raisim {
                 if (i==0)
                 {
                     raisim::transpose(Body_orientation, body_orientation_transpose);
-                    rel_objpalm[0] = Obj_Position[0]-Position[0];
-                    rel_objpalm[1] = Obj_Position[1]-Position[1];
-                    rel_objpalm[2] = Obj_Position[2]-Position[2];
+                    rel_objpalm[0] = Position[0]-Obj_Position[0];
+                    rel_objpalm[1] = Position[1]-Obj_Position[1];
+                    rel_objpalm[2] = Position[2]-Obj_Position[2];
 
                     rel_objpalm_pos_ = Body_orientation.e().transpose()*rel_objpalm.e(); // relative position between object and wrist in wrist coordinates
 

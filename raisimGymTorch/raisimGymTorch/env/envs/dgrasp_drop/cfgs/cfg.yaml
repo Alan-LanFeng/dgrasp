@@ -1,6 +1,6 @@
 seed: 1
 record_video: yes
-module: mcg
+module: MLP
 
 environment:
   get_pcd: True
@@ -35,7 +35,7 @@ environment:
     pos_reward:
       coeff: 2.0
     pose_reward:
-      coeff: 0.0
+      coeff: 0.1
 #    root_pos_reward_:
 #      coeff: 0.0
 #    root_pose_reward_:
@@ -59,7 +59,7 @@ environment:
     body_vel_reward_:
       coeff: -0.5
     body_qvel_reward_:
-      coeff: -1
+      coeff: -0.5
 architecture:
   policy_net: [128,128]
   value_net: [128, 128]

@@ -78,7 +78,7 @@ class MLP_network(nn.Module):
         super(MLP_network, self).__init__()
         self.activation_fn = nn.LeakyReLU
 
-        shape = [256, 128]
+        shape = [128, 128]
 
         modules = [nn.Linear(input_size, shape[0]), self.activation_fn()]
         scale = [np.sqrt(2)]
