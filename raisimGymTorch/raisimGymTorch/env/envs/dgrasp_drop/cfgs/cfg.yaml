@@ -59,7 +59,7 @@ environment:
     body_vel_reward_:
       coeff: -0.5
     body_qvel_reward_:
-      coeff: -1
+      coeff: -0.5
 architecture:
   policy_net: [128,128]
   value_net: [128, 128]
