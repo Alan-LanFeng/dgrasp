@@ -22,7 +22,7 @@ class RaisimGymVecEnv:
         if platform.system() == "Darwin":
             os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
-        self.model = PointNetAutoEncoder()
+        #self.model = PointNetAutoEncoder()
 
         self.normalize_ob = normalize_ob
         self.normalize_rew = normalize_rew
