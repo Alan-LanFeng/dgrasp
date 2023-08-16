@@ -22,8 +22,6 @@ class RaisimGymVecEnv:
         if platform.system() == "Darwin":
             os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
-        model = PointNetAutoEncoder.load_from_checkpoint(
-            'raisimGymTorch/data_all/pointnet_ae.ckpt')
 
         self.normalize_ob = normalize_ob
         self.normalize_rew = normalize_rew
