@@ -193,6 +193,7 @@ for update in range(args.num_iterations):
         r_0[k] = r_0[k] / len(reward_info)
     r_0['crush_rate'] = success_rate
 
+    r_0['rewards'] = average_ll_performance
     wandb.log(r_0)
 
     # print('----------------------------------------------------')
