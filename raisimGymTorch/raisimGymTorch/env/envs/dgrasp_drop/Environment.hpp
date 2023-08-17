@@ -792,8 +792,24 @@ namespace raisim {
                 return true;
             }
 
-           if (time_step == 100)
+           if (time_step == 50)
             {
+                if (cylinder_mesh)
+                {
+                    Obj_Position = cylinder->getPosition();
+                }
+                else if (box_obj_mesh)
+                {
+                    Obj_Position = box_obj->getPosition();
+                }
+                else
+                {
+                    Obj_Position = obj_mesh_1->getPosition();
+                }
+                height_diff = obj_pos_init_[2]-Obj_Position[2];
+                if (height_diff>0.2)
+                {
+
                     box->getPosition(0,table_pos);
                     // print warning
 //                    std::cout << "Warning: Object is falling" << std::endl;
@@ -811,9 +827,10 @@ namespace raisim {
                         box->setPosition(1.25, 0, 0.25);
                         box->setOrientation(1,0,0,0);
                         box->setVelocity(0,0,0,0,0,0);
-                        return true;
                     }
 
+                    return true;
+                }
             }
 
             if (fall){
