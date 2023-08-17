@@ -203,7 +203,7 @@ class RaisimGymVecEnv:
             obj_pcd = self.obj_pcd.cpu().detach().numpy()
             env_num, pcd_num, dim = obj_pcd.shape
             #
-            obj_pos = copy.copy(obs[:, 264:267])
+            obj_pos = -copy.copy(obs[:, 264:267])
             obj_euler = copy.copy(obs[:, 267:270])
             # hand_pos = copy.copy(obs[:, :3])
             # hand_euler = copy.copy(obs[:, 3:6])

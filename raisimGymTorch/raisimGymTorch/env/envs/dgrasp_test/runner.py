@@ -207,7 +207,7 @@ else:
     hand_pos_init = next_obs[:, :3]
     r_hand = R.from_euler('XYZ', hand_rot_init, degrees=False)
 
-    obj_pos_hand = next_obs[:,264:267]
+    obj_pos_hand = -next_obs[:,264:267]
     obj_rot_hand = next_obs[:,267:270]
     r_obj = R.from_euler('XYZ', obj_rot_hand, degrees=False)
 
