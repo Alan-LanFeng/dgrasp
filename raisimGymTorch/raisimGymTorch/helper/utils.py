@@ -128,6 +128,7 @@ def get_args():
     parser.add_argument('-nr', '--num_repeats', type=int, default=10)
     parser.add_argument('-ev', '--vis_evaluate', action="store_true")
     parser.add_argument('-sv', '--store_video', action="store_true")
+    parser.add_argument('-nt', '--num_threads', type=int, default=20)
 
     args = parser.parse_args()
 

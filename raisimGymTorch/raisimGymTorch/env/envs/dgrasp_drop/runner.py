@@ -43,6 +43,10 @@ def get_ppo(mod):
 ### configuration of command line arguments
 args = get_args()
 setup_seed(args.seed)
+num_threads = args.num_threads
+os.environ['OMP_NUM_THREADS'] = str(num_threads)
+os.environ['MKL_NUM_THREADS'] = str(num_threads)
+torch.set_num_threads(num_threads)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 task_path = os.path.dirname(os.path.realpath(__file__))
