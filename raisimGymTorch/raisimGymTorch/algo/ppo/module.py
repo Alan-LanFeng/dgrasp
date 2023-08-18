@@ -12,6 +12,8 @@ class Actor:
         super(Actor, self).__init__()
 
         self.architecture = architecture
+        total_params = sum(p.numel() for p in self.architecture.parameters())
+        print(f"Total number of parameters: {total_params}")
         self.distribution = distribution
         self.architecture.to(device)
         self.distribution.to(device)

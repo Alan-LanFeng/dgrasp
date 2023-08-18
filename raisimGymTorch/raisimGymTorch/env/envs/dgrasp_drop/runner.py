@@ -7,6 +7,7 @@ from raisimGymTorch.env.bin.dgrasp_drop import NormalSampler
 import os
 import time
 import raisimGymTorch.algo.ppo.module as ppo_module
+import raisimGymTorch.algo.ppo.dense_mlp as dense_mlp
 import raisimGymTorch.algo.ppo.ppo as PPO
 import torch.nn as nn
 import numpy as np
@@ -56,6 +57,7 @@ print(f"Experiment name: \"{args.exp_name}\"")
 cfg = YAML().load(open(task_path+'/cfgs/' + args.cfg, 'r'))
 if cfg['module'] == 'MLP':
     mod = ppo_module.MLP_network
+    mod = dense_mlp.DeepMLP_network
     cfg['environment']['get_pcd'] = False
     cfg['environment']['extra_dim'] = 1
 elif cfg['module'] == 'mcg':
@@ -85,8 +87,8 @@ if args.all_objects:
     repeated_label = repeat_label(dict_labels, args.num_repeats)
 else:
     repeated_label = repeat_label(dict_labels[args.obj_id], args.num_repeats)
-# for k,v in dict_labels.items():
-#     dict_labels[k] = v[:10]
+# for k,v in repeated_label.items():
+#     repeated_label[k] = v[:200]
 
 num_envs = repeated_label['final_qpos'].shape[0]
 cfg['environment']['num_envs'] = num_envs
@@ -121,7 +123,7 @@ for update in range(args.num_iterations):
     average_dones = 0.
 
     ### Store policy
-    if update % cfg['environment']['eval_every_n'] == 0:
+    if update % cfg['environment']['eval_every_n'] == 0 and update:
         print("Visualizing and evaluating the current policy")
         torch.save({
             'actor_architecture_state_dict': ppo.actor.architecture.state_dict(),
