@@ -61,6 +61,7 @@ print(f"Experiment name: \"{args.exp_name}\"")
 cfg = YAML().load(open(task_path+'/cfgs/' + args.cfg, 'r'))
 if cfg['module'] == 'MLP':
     mod = ppo_module.MLP_network
+    import raisimGymTorch.algo.ppo.dense_mlp as dense_mlp
     mod = dense_mlp.DeepMLP_network
     cfg['environment']['get_pcd'] = False
     cfg['environment']['extra_dim'] = 1
