@@ -52,6 +52,7 @@ namespace raisim {
             /// initialize all variables
             pTarget_.setZero(gcDim_); vTarget_.setZero(gvDim_); pTarget6_.setZero(6);
             final_pose_.setZero(nJoints_), final_obj_pos_.setZero(7), final_ee_pos_.setZero(num_bodyparts*3), final_contact_pos_.setZero(num_contacts*3), final_vertex_normals_.setZero(num_contacts*3), contact_body_idx_.setZero(num_contacts), final_contact_array_.setZero(num_contacts);
+            target_obj_pos_.setZero(7);
             rel_pose_.setZero(nJoints_), rel_obj_pos_.setZero(3), rel_objpalm_pos_.setZero(3), rel_body_pos_.setZero(num_bodyparts*3), rel_contact_pos_.setZero(num_contacts*3),  rel_obj_pose_.setZero(3), contacts_.setZero(num_contacts), rel_contacts_.setZero(num_contacts), impulses_.setZero(num_contacts);
             actionDim_ = gcDim_; actionMean_.setZero(actionDim_);  actionStd_.setOnes(actionDim_);
             joint_limit_high.setZero(actionDim_); joint_limit_low.setZero(actionDim_);
@@ -88,7 +89,7 @@ namespace raisim {
             mano_->setGeneralizedCoordinate(Eigen::VectorXd::Zero(gcDim_));
 
             /// MUST BE DONE FOR ALL ENVIRONMENTS (CURRENTLY MANUALLY)
-            obDim_ =  283;
+            obDim_ =  341;
             obDouble_.setZero(obDim_);
 
             testing =  cfg["testing"].As<bool>();
@@ -352,7 +353,7 @@ namespace raisim {
         /// goal_pose: Hand goal pose (48DoF), 3DoF global euler rotation + 45DoF local joint angles
         /// contact_pos: Deprecated (63 DoF)
         /// goal_contacts: Hand parts that should be in contact (16 hand parts)
-        void set_goals(const Eigen::Ref<EigenVec>& obj_goal_pos, const Eigen::Ref<EigenVec>& ee_goal_pos, const Eigen::Ref<EigenVec>& goal_pose, const Eigen::Ref<EigenVec>& contact_pos, const Eigen::Ref<EigenVec>& goal_contacts) final {
+        void set_goals(const Eigen::Ref<EigenVec>& obj_goal_pos, const Eigen::Ref<EigenVec>& ee_goal_pos, const Eigen::Ref<EigenVec>& goal_pose, const Eigen::Ref<EigenVec>& contact_pos, const Eigen::Ref<EigenVec>& goal_contacts, const Eigen::Ref<EigenVec>& obj_6D_pos) final {
 
             raisim::Vec<4> quat_goal_hand_w, quat_goal_hand_r, quat_obj_init;
             raisim::Vec<3> euler_goal_pose;
@@ -377,6 +378,7 @@ namespace raisim {
             final_pose_ = goal_pose.cast<double>();
             final_pose_.head(3) = euler_goal_pose.e();
 
+            target_obj_pos_  = obj_6D_pos.cast<double>();
             /// Compute and convert hand 3D joint positions into object relative frame
             for(int i=0; i<num_bodyparts; i++){
                 Position[0] = ee_goal_pos[i*3]-final_obj_pos_[0];
@@ -411,11 +413,10 @@ namespace raisim {
             raisim::Mat<3, 3> rot, rot_trans, rot_world, rot_goal, rotmat_final_obj_pos, rotmat_final_obj_pos_trans;
             raisim::Vec<3> obj_pos_raisim, euler_goal_world, final_obj_pose_mat, hand_pos_world, hand_pose, act_pos, act_or_pose;
             raisim::transpose(Obj_orientation_temp,Obj_orientation);
-            obj_pos_raisim[0] = final_obj_pos_[0]-Obj_Position[0]; obj_pos_raisim[1] = final_obj_pos_[1]-Obj_Position[1]; obj_pos_raisim[2] = final_obj_pos_[2]-Obj_Position[2];
-
+            obj_pos_raisim[0] = target_obj_pos_[0]-Obj_Position[0]; obj_pos_raisim[1] = target_obj_pos_[1]-Obj_Position[1]; obj_pos_raisim[2] = target_obj_pos_[2]-Obj_Position[2];
             if (motion_synthesis)
             {
-                raisim::quatToRotMat(final_obj_pos_.tail(4),rotmat_final_obj_pos);
+                raisim::quatToRotMat(target_obj_pos_.tail(4),rotmat_final_obj_pos);
                 raisim::transpose(rotmat_final_obj_pos, rotmat_final_obj_pos_trans);
                 raisim::matvecmul(rotmat_final_obj_pos, final_ee_pos_.head(3), Fpos_world);
                 raisim::vecadd(obj_pos_raisim, Fpos_world); //Obj_Position before
@@ -437,7 +438,7 @@ namespace raisim {
                 raisim::Vec<3> euler_obj_pose_goal, euler_obj_pose_curr, diff_obj_pose, rot_goal_euler;
                 pose_goal = action.segment(3,3);
                 raisim::eulerToQuat(pose_goal,quat_pg);
-                raisim::quatToRotMat(final_obj_pos_.tail(4),rotmat_gc);
+                raisim::quatToRotMat(target_obj_pos_.tail(4),rotmat_gc);
                 raisim::matmul(init_or_, rotmat_gc, rotmat_gc_trans);
                 raisim::RotmatToEuler(rotmat_gc_trans, euler_obj_pose_goal);
 
@@ -498,12 +499,12 @@ namespace raisim {
             pTarget_ += actionMean_; //add wrist bias (first 3DOF) and last pose (48DoF)
 
             /// If in testing and static pose mode, replace global pTarget by static pose
-            if (testing)
-            {
-                /// static global pose
-                pTarget_.head(3) = up_vec.e();
-                pTarget_.segment(3,3) = up_pose;
-            }
+            // if (testing)
+            // {
+            //     /// static global pose
+            //     pTarget_.head(3) = up_vec.e();
+            //     pTarget_.segment(3,3) = up_pose;
+            // }
 
             /// Clip targets to limits
             Eigen::VectorXd pTarget_clipped;
@@ -563,7 +564,7 @@ namespace raisim {
         /// This function computes and updates the observation/state space
         void updateObservation() {
             raisim::Vec<4> quat, quat_hand, quat_obj_init;
-            raisim::Vec<3> body_vel, obj_frame_diff, obj_frame_diff_w, obj_frame_diff_h, euler_hand, sphere_pos, norm_pos, rel_wbody_root, euler_obj, rel_rbody_root, rel_body_table, rel_obj_init, rel_objpalm, rel_obj_pose_r3;
+            raisim::Vec<3> palm_world_pos_, palm_world_pose_, body_vel, obj_frame_diff, obj_frame_diff_w, obj_frame_diff_h, euler_hand, sphere_pos, norm_pos, rel_wbody_root, euler_obj, rel_rbody_root, rel_body_table, rel_obj_init, rel_objpalm, rel_obj_pose_r3;
             raisim::Mat<3,3> rot, rot_mult, body_orientation_transpose, palm_world_pose_mat, palm_world_pose_mat_trans, obj_pose_wrist_mat, rel_pose_mat, final_obj_rotmat_temp, diff_obj_pose_mat, final_obj_wrist, obj_wrist, obj_wrist_trans, final_obj_pose_mat;
 
             contacts_.setZero();
@@ -578,7 +579,7 @@ namespace raisim {
             {
                 Obj_Position = cylinder->getPosition();
                 Obj_orientation_temp = cylinder->getRotationMatrix();
-                cylinder->getQuaternion(obj_quat);
+                obj_quat = cylinder->getQuaternion();
                 Obj_qvel = cylinder->getAngularVelocity();
                 Obj_linvel = cylinder->getLinearVelocity();
             }
@@ -586,7 +587,7 @@ namespace raisim {
             {
                 Obj_Position = box_obj->getPosition();
                 Obj_orientation_temp = box_obj->getRotationMatrix();
-                box_obj->getQuaternion(obj_quat);
+                obj_quat = box_obj->getQuaternion();
                 Obj_qvel = box_obj->getAngularVelocity();
                 Obj_linvel = box_obj->getLinearVelocity();
             }
@@ -594,7 +595,7 @@ namespace raisim {
             {
                 Obj_Position = obj_mesh_1->getPosition();
                 Obj_orientation_temp = obj_mesh_1->getRotationMatrix();
-                obj_mesh_1->getQuaternion(obj_quat);
+                obj_quat= obj_mesh_1->getQuaternion();
                 Obj_qvel = obj_mesh_1->getAngularVelocity();
                 Obj_linvel = obj_mesh_1->getLinearVelocity();
             }
@@ -605,8 +606,9 @@ namespace raisim {
 
             /// compute object pose in wrist frame
             mano_->getFrameOrientation(body_parts_[0], palm_world_pose_mat);
+            mano_->getFramePosition(body_parts_[0], palm_world_pos_);
             raisim::transpose(palm_world_pose_mat,palm_world_pose_mat_trans);
-
+            raisim::RotmatToEuler(palm_world_pose_mat,palm_world_pose_);
             raisim::matmul(palm_world_pose_mat_trans, Obj_orientation_temp, obj_pose_wrist_mat);
             raisim::RotmatToEuler(obj_pose_wrist_mat, obj_pose_);
 
@@ -750,7 +752,13 @@ namespace raisim {
                     rel_obj_qvel,
 
                     Obj_Position.e(),
-                    obj_table_contact;
+                    obj_table_contact,
+                    palm_world_pos_.e(),
+                    palm_world_pose_.e(),
+                    gc_.tail(gcDim_-6),
+                    Obj_Position.e(),
+                    obj_quat.e()
+                    ;
         }
 
         /// Set observation in wrapper to current observation
@@ -773,17 +781,17 @@ namespace raisim {
 
             mano_->setPdGains(jointPgain, jointDgain);
 
-            /// lower the surface box
-            box->setPosition(1.25,0,0.0);
+            // /// lower the surface box
+            // box->setPosition(1.25,0,0.0);
 
-            /// If rendered, also lower the visualized table
-            if (visualizable_) {
-                table_top->setPosition(1.25, 0, 0.225);
-                leg1->setPosition(0.2625, 0.4875, -0.015);
-                leg2->setPosition(2.2475, 0.4875, -0.015);
-                leg3->setPosition(0.2625, -0.4875, -0.015);
-                leg4->setPosition(2.2475, -0.4875, -0.015);
-            }
+            // /// If rendered, also lower the visualized table
+            // if (visualizable_) {
+            //     table_top->setPosition(1.25, 0, 0.225);
+            //     leg1->setPosition(0.2625, 0.4875, -0.015);
+            //     leg2->setPosition(2.2475, 0.4875, -0.015);
+            //     leg3->setPosition(0.2625, -0.4875, -0.015);
+            //     leg4->setPosition(2.2475, -0.4875, -0.015);
+            // }
 
 
             raisim::Vec<3> frame_pos;
@@ -822,7 +830,7 @@ namespace raisim {
         bool visualizable_ = false;
         raisim::ArticulatedSystem* mano_;
         Eigen::VectorXd gc_, gv_, pTarget_, pTarget6_, vTarget_, gc_set_, gv_set_,  obj_pos_init_;
-        Eigen::VectorXd gen_force_, final_obj_pos_, final_pose_, final_ee_pos_, final_contact_pos_, final_contact_array_, contact_body_idx_, final_vertex_normals_;
+        Eigen::VectorXd gen_force_, final_obj_pos_, target_obj_pos_, final_pose_, final_ee_pos_, final_contact_pos_, final_contact_array_, contact_body_idx_, final_vertex_normals_;
         double terminalRewardCoeff_ = -10.;
         double pose_reward_= 0.0;
         double pos_reward_ = 0.0;

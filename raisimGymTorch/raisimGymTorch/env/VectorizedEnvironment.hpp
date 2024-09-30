@@ -83,10 +83,10 @@ class VectorizedEnvironment {
           environments_[i]->reset_state(init_state.row(i), init_vel.row(i), obj_pose.row(i));
   }
 
-    void set_goals(Eigen::Ref<EigenRowMajorMat> &obj_pos, Eigen::Ref<EigenRowMajorMat> &ee_pos, Eigen::Ref<EigenRowMajorMat> &pose, Eigen::Ref<EigenRowMajorMat> &contact_pos, Eigen::Ref<EigenRowMajorMat> &vertex_normals) {
+    void set_goals(Eigen::Ref<EigenRowMajorMat> &obj_pos, Eigen::Ref<EigenRowMajorMat> &ee_pos, Eigen::Ref<EigenRowMajorMat> &pose, Eigen::Ref<EigenRowMajorMat> &contact_pos, Eigen::Ref<EigenRowMajorMat> &vertex_normals, Eigen::Ref<EigenRowMajorMat> &obj_6D_pos) {
 #pragma omp parallel for
         for (int i = 0; i < num_envs_; i++)
-            environments_[i]->set_goals(obj_pos.row(i), ee_pos.row(i), pose.row(i), contact_pos.row(i), vertex_normals.row(i));
+            environments_[i]->set_goals(obj_pos.row(i), ee_pos.row(i), pose.row(i), contact_pos.row(i), vertex_normals.row(i), obj_6D_pos.row(i));
     }
 
   void observe(Eigen::Ref<EigenRowMajorMat> &ob) {

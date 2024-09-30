@@ -68,6 +68,7 @@ cfg['seed']=args.seed
 
 pre_grasp_steps = cfg['environment']['pre_grasp_steps']
 trail_steps = cfg['environment']['trail_steps']
+
 test_inference = args.test
 train_obj_id = args.obj_id
 all_obj_train = True if args.all_objects else False
@@ -78,13 +79,30 @@ num_repeats= args.num_repeats
 activations = nn.LeakyReLU
 output_activation = nn.Tanh
 
-dict_labels = joblib.load("raisimGymTorch/data/handover_acr_.pkl")
-# for key in dict_labels:
-#     #if key!=1:continue
-#     for key2 in dict_labels[key]:
-#         dict_labels[key][key2] = dict_labels[key][key2][:2]
 
-# dict_labels = joblib.load("raisimGymTorch/data/dexycb_test_graspgen.pkl")
+# dict_labels_1 = joblib.load("dgrasp_gtta_batch_1.pkl")
+# dict_labels_2 = joblib.load("dgrasp_gtta_batch_2.pkl")
+# # #dict_labels_3 = joblib.load("dgrasp_batch_3.pkl")
+# all_labels = {}
+
+# all_labels['obj_pose'] = np.concatenate((dict_labels_1['obj_pose'],dict_labels_2['obj_pose']))
+# all_labels['hand_pose'] =  np.concatenate((dict_labels_1['hand_pose'],dict_labels_2['hand_pose']))
+# all_labels['obj_name'] = np.concatenate((dict_labels_1['obj_name'],dict_labels_2['obj_name']))
+# all_labels['gripper_T'] =  np.concatenate((dict_labels_1['gripper_T'],dict_labels_2['gripper_T']))
+# joblib.dump(all_labels, 'dgrasp_gtta.pkl')
+
+
+dict_labels = joblib.load("raisimGymTorch/data/handover_acr_all.pkl")
+#import pdb
+#pdb.set_trace()
+
+subdict={}
+for key in dict_labels:
+    if key <= 1000:
+        subdict[key] = {}
+        for key2 in dict_labels[key]:
+            subdict[key][key2] = dict_labels[key][key2]
+dict_labels = subdict
 
 
 if args.all_objects:
@@ -94,6 +112,7 @@ else:
     repeated_label = repeat_label(dict_labels[args.obj_id], 1)
 control_dir = repeated_label['qpos_reset'][:,:3]-repeated_label['obj_pose_reset'][:,:3]
 num_envs = repeated_label['final_qpos'].shape[0]
+
 # mesh_path = "../rsc/meshes_simplified/008_pudding_box/mesh_aligned.obj"
 # obj_pcd = get_obj_pcd(mesh_path)
 obj_pcd = None
@@ -109,7 +128,7 @@ act_dim = env.num_acts
 
 ### Set training step parameters
 grasp_steps = pre_grasp_steps
-n_steps = grasp_steps  + trail_steps
+n_steps = grasp_steps  + trail_steps + 50
 
 avg_rewards = []
 
@@ -123,7 +142,7 @@ ppo = get_ppo(mod)
 ### Loading a pretrained model
 load_param(saver.data_dir.split('eval')[0]+args.weight, env, ppo.actor, ppo.critic, ppo.optimizer, saver.data_dir,args.cfg, store_again=False)
 
-
+dgrasp_data = {}
 ### Evaluate trained model visually (note always the first environment gets visualized)
 if args.vis_evaluate:
     ### Start recording
@@ -199,6 +218,8 @@ else:
         wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
         if wait_time > 0.:
             time.sleep(wait_time)
+    
+    env.store_dict()
 
     ################# get relative direction################
     init_pos = repeated_label['qpos_reset'][:,:3]

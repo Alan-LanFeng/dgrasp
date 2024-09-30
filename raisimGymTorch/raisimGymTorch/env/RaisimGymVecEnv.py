@@ -11,7 +11,6 @@ from raisimGymTorch.helper.utils import dgrasp_to_mano,show_pointcloud_objhand,I
 import torch
 from manopth.manolayer import ManoLayer
 
-
 class RaisimGymVecEnv:
 
     def __init__(self, impl, cfg, normalize_ob=False,
@@ -38,10 +37,59 @@ class RaisimGymVecEnv:
         # if obj_pcd:
         self.obj_pcd = obj_pcd
         label['final_contact_pos'] = np.zeros_like(label['final_contacts'])
+        label['target_obj_pos'] = label['final_obj_pos'].copy()
+        
+        
+        min_noise_pos_bin1 = [-0.3, -0.3, 0.10]
+        max_noise_pos_bin1 = [0.3, 0.3, 0.5]
+
+        # min_noise_pos_bin2 = [0.0, 0.0, 0.0]
+        # max_noise_pos_bin2 = [0.2, 0.2, 0.3]
+        # #
+        # min_noise_pos_bin3 = [0.2, 0.2, 0.2]
+        # max_noise_pos_bin3 = [0.3, 0.3, 0.4]
+        # #
+        targets_bin_1 = np.random.uniform(min_noise_pos_bin1,max_noise_pos_bin1,(label['target_obj_pos'].shape[0],3))
+        # targets_bin_2 = np.random.uniform(min_noise_pos_bin2,max_noise_pos_bin2,(100,3))
+        # targets_bin_3 = np.random.uniform(min_noise_pos_bin3,max_noise_pos_bin3,(100,3))
+        # #
+        # #
+        # sign_x_bin2 = np.where(np.random.uniform(0,1,100) > 0.5)[0]
+        # sign_y_bin2 = np.where(np.random.uniform(0,1,100) > 0.5)[0]
+        # sign_x_bin3 = np.where(np.random.uniform(0,1,100) > 0.5)[0]
+        # sign_y_bin3 = np.where(np.random.uniform(0,1,100) > 0.5)[0]
+        # #
+        # targets_bin_2[sign_x_bin2,0] *= -1
+        # targets_bin_2[sign_y_bin2,1] *= -1
+        # targets_bin_3[sign_x_bin3,0] *= -1
+        # targets_bin_3[sign_y_bin3,1] *= -1
+        # #
+        # noise_bin1 = np.random.uniform(0.0,0.25,(100,3))
+        # noise_bin2 = np.random.uniform(0.0,0.5,(100,3))
+        # noise_bin3 = np.random.uniform(0.7,2.0,(100,3))
+
+        # motion_eval_dict = {}
+        # motion_eval_dict['bin1'] = {}
+        # motion_eval_dict['bin2'] = {}
+        # motion_eval_dict['bin3'] = {}
+
+        # motion_eval_dict['bin1']['target_pos'] = targets_bin_1
+        # motion_eval_dict['bin2']['target_pos'] = targets_bin_2
+        # motion_eval_dict['bin3']['target_pos'] = targets_bin_3
+        # motion_eval_dict['bin1']['ang_noise'] = noise_bin1
+        # motion_eval_dict['bin2']['ang_noise'] = noise_bin2
+        # motion_eval_dict['bin3']['ang_noise'] = noise_bin3
+
+        label['target_obj_pos'][:,:3] += targets_bin_1
+
+        self.obj_names = label['obj_name']
+
+        self.gripper_T = label['gripper_T']
+
         self.load_object(label['obj_name'], label['obj_w_stacked'], label['obj_dim_stacked'],
                          label['obj_type_stacked'])
         self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
-                       label['final_contacts'])
+                       label['final_contacts'], label['target_obj_pos'])
         self.get_pcd = cfg['get_pcd']
 
         mano_layer = ManoLayer(mano_root='raisimGymTorch/data', flat_hand_mean=False, ncomps=45, use_pca=True)
@@ -52,6 +100,8 @@ class RaisimGymVecEnv:
 
         self.mean_pca = mean_pca.numpy()
 
+    def load_object(self, obj_idx, obj_weight, obj_dim, obj_type):
+        self.wrapper.load_object(obj_idx, obj_weight, obj_dim, obj_type)
 
     def move_to_first(self,i):
 
@@ -62,7 +112,10 @@ class RaisimGymVecEnv:
         self.load_object(label['obj_name'], label['obj_w_stacked'], label['obj_dim_stacked'],
                          label['obj_type_stacked'])
         self.set_goals(label['final_obj_pos'], label['final_ee'], label['final_pose'], label['final_contact_pos'],
-                       label['final_contacts'])
+                       label['final_contacts'], label['target_obj_pos'])
+
+    def set_goals(self, obj_pos, ee_pos, pose, contact_pos, normals, obj_6D_pos):
+        self.wrapper.set_goals(obj_pos, ee_pos, pose, contact_pos, normals, obj_6D_pos)
 
     def seed(self, seed=None):
         self.wrapper.setSeed(seed)
@@ -128,11 +181,11 @@ class RaisimGymVecEnv:
         # ret_obs['hand_obs'] = obs[:,:121]
         # ret_obs['label_obs'] = obs[:,121:264]
         # ret_obs['obj_info'] = obs[:,264:]
-
+        self.obj_pose.append(meta_info[:,-7:])
+        self.hand_pose.append(meta_info[:,3:-7])
         step_obs = np.zeros([self._observation.shape[0],1]).astype('float32')
         step_obs[:] = self.time_step/self.n_steps
         obs = np.concatenate([obs,step_obs],axis=1)
-
 
         if self.get_pcd:
             obj_pcd = self.obj_pcd
@@ -185,6 +238,10 @@ class RaisimGymVecEnv:
         qpos_reset = self.label['qpos_reset'].copy()
         obj_pose_reset = self.label['obj_pose_reset'].copy()
         num_envs = qpos_reset.shape[0]
+
+        self.obj_pose = []
+        self.hand_pose = []
+
         if add_noise:
             random_noise_pos = np.random.uniform([-0.02, -0.02, 0.01], [0.02, 0.02, 0.01], (num_envs, 3)).copy()
             random_noise_qpos = np.random.uniform(-0.05, 0.05, (num_envs, 48)).copy()
@@ -197,7 +254,22 @@ class RaisimGymVecEnv:
             self.reset_state(qpos_reset, np.zeros((num_envs, 51), 'float32'), obj_pose_reset)
 
         obs, info = self.observe()
+
         return obs, info
+
+    def store_dict(self):
+        import joblib
+
+        self.result_dict = {}
+
+        meta_info = np.array(self.hand_pose).swapaxes(0,1)
+        valid_seqs = np.where(meta_info[:,-1,0] != 1)[0]
+
+        self.result_dict['obj_pose'] = np.array(self.obj_pose).swapaxes(0,1)[valid_seqs]
+        self.result_dict['hand_pose'] = meta_info[valid_seqs,:,1:]
+        self.result_dict['obj_name'] = self.obj_names[valid_seqs]
+        self.result_dict['gripper_T'] = self.gripper_T[valid_seqs]
+        joblib.dump(self.result_dict, 'dgrasp_more.pkl')
 
     def load_object(self, obj_idx, obj_weight, obj_dim, obj_type):
         #obj_idx = [IDX_TO_OBJ[obj_id+1][0] for obj_id in obj_idx]
@@ -209,8 +281,8 @@ class RaisimGymVecEnv:
 
         self.wrapper.reset_state(init_state, init_vel, obj_pose)
 
-    def set_goals(self, obj_pos, ee_pos, pose, contact_pos, normals):
-        self.wrapper.set_goals(obj_pos, ee_pos, pose, contact_pos, normals)
+    def set_goals(self, obj_pos, ee_pos, pose, contact_pos, normals, obj_6D_pos):
+        self.wrapper.set_goals(obj_pos, ee_pos, pose, contact_pos, normals, obj_6D_pos)
 
     def _normalize_observation(self, obs):
         if self.normalize_ob:

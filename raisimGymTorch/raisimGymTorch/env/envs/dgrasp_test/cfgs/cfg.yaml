@@ -4,7 +4,7 @@ module: MLP
 
 environment:
   get_pcd: True
-  metainfo_dim: 4
+  metainfo_dim: 62
   extra_dim: 301
   render: True
   num_envs: 21
@@ -27,8 +27,8 @@ environment:
   weight: 0.1
   finger_action_std: 0.015
   rot_action_std: 0.01
-  pre_grasp_steps: 60
-  trail_steps: 50
+  pre_grasp_steps: 30
+  trail_steps: 100
   reward_clip: -2.0
   reward:
     pos_reward:

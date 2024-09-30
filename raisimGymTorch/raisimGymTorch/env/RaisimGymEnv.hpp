@@ -45,7 +45,7 @@ class RaisimGymEnv {
   virtual void reset() = 0;
 
   virtual void reset_state(const Eigen::Ref<EigenVec>& init_state, const Eigen::Ref<EigenVec>& init_vel,  const Eigen::Ref<EigenVec>& obj_pose) = 0;
-  virtual void set_goals(const Eigen::Ref<EigenVec>& obj_pos, const Eigen::Ref<EigenVec>& ee_pos, const Eigen::Ref<EigenVec>& pose, const Eigen::Ref<EigenVec>& contact_pos, const Eigen::Ref<EigenVec>& vertex_normals) = 0;
+  virtual void set_goals(const Eigen::Ref<EigenVec>& obj_pos, const Eigen::Ref<EigenVec>& ee_pos, const Eigen::Ref<EigenVec>& pose, const Eigen::Ref<EigenVec>& contact_pos, const Eigen::Ref<EigenVec>& vertex_normals, const Eigen::Ref<EigenVec>& obj_6D_pos) = 0;
   virtual void observe(Eigen::Ref<EigenVec> ob) = 0;
   virtual void set_root_control() = 0;
   virtual float step(const Eigen::Ref<EigenVec>& action) = 0;
